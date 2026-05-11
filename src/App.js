@@ -1,19 +1,24 @@
 // ============================================================
 // MAVILLESAINE — Back-office Superviseur (React Web)
+// Architecture : Supabase Auth direct (sans backend Railway)
 // ============================================================
+// DÉPLOIEMENT :
+//   1. Remplace src/App.js par ce fichier dans mavillesaine-backoffice
+//   2. npm install @supabase/supabase-js
+//   3. git add . && git commit -m "migrate to supabase direct" && git push
+//   Vercel redéploie automatiquement
+// ============================================================
+
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
 import toast, { Toaster } from "react-hot-toast";
 
-const API_URL = "https://mavillesaine-backend.onrender.com/api";
+// ── Config Supabase ───────────────────────────────────────────
+const SUPABASE_URL  = "https://yemtwkylcankpopwrpav.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllbXR3a3lsY2Fua3BvcHdycGF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTY3NDEsImV4cCI6MjA5MzgzMjc0MX0.yHopBYugcAjOxdt7HeMcRlK7xnrW5rur0_7A9sWeJ_E";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const api = axios.create({ baseURL: API_URL });
-api.interceptors.request.use(cfg => {
-  const token = localStorage.getItem("mvp_token");
-  if (token) cfg.headers.Authorization = `Bearer ${token}`;
-  return cfg;
-});
-
+// ── Constantes ────────────────────────────────────────────────
 const CATEGORIES = [
   { id:"voirie",    label:"Voirie",         icon:"🛣️", color:"#e05c00" },
   { id:"proprete",  label:"Propreté",        icon:"🗑️", color:"#2a9d3a" },
@@ -41,6 +46,7 @@ const G = {
   g400:"#94a3b8", g500:"#64748b", g700:"#334155", g900:"#0f172a",
 };
 
+// ── Composants UI ─────────────────────────────────────────────
 function Badge({ statut }) {
   const s = STATUTS[statut] || STATUTS.recu;
   return (
@@ -52,13 +58,13 @@ function Badge({ statut }) {
   );
 }
 
-function BadgeUrgence({ urgence, ia }) {
+function BadgeUrgence({ urgence }) {
   const u = URGENCES[urgence] || URGENCES.normal;
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px",
       borderRadius:20, background:u.bg, color:u.color, fontSize:11, fontWeight:700,
       border:`1px solid ${u.border}`, whiteSpace:"nowrap" }}>
-      {u.icon} {u.label}{ia && <span style={{ fontSize:9, opacity:0.7 }}> ·IA</span>}
+      {u.icon} {u.label}
     </span>
   );
 }
@@ -74,7 +80,6 @@ function CatIcon({ id, size=36 }) {
 }
 
 // ── Écran LOGIN ───────────────────────────────────────────────
-
 function LoginScreen({ onLogin }) {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -85,18 +90,30 @@ function LoginScreen({ onLogin }) {
     e.preventDefault();
     setLoading(true); setError("");
     try {
-      const { data } = await api.post("/auth/login", { email, password });
-      localStorage.setItem("mvp_token", data.token);
-      localStorage.setItem("mvp_user",  JSON.stringify(data.user));
-      onLogin(data.user);
+      // 1. Auth Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw new Error("Identifiants incorrects");
+
+      // 2. Récupérer le profil superviseur
+      const { data: sup, error: supError } = await supabase
+        .from("superviseurs")
+        .select("id, nom, email, role, commune_id, actif, communes(nom, couleur)")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (supError || !sup) throw new Error("Compte superviseur introuvable");
+      if (!sup.actif) throw new Error("Compte désactivé — contactez l'administrateur");
+
+      onLogin(sup);
     } catch (err) {
-      setError(err.response?.data?.error || "Identifiants incorrects");
+      setError(err.message);
     } finally { setLoading(false); }
   };
 
   return (
     <div style={{ minHeight:"100vh", background:`linear-gradient(135deg,${G.g900},#1a3a2a)`,
-      display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Outfit',system-ui,sans-serif" }}>
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontFamily:"'Outfit',system-ui,sans-serif" }}>
       <div style={{ background:"#fff", borderRadius:20, padding:"40px 36px", width:380,
         boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
         <div style={{ textAlign:"center", marginBottom:28 }}>
@@ -113,7 +130,7 @@ function LoginScreen({ onLogin }) {
         )}
         <form onSubmit={handleLogin}>
           {[
-            { label:"Email", type:"email",    val:email,    set:setEmail,    ph:"admin@mavillesaine.fr" },
+            { label:"Email",        type:"email",    val:email,    set:setEmail,    ph:"superviseur@mairie.fr" },
             { label:"Mot de passe", type:"password", val:password, set:setPassword, ph:"••••••••" },
           ].map(f => (
             <div key={f.label} style={{ marginBottom:16 }}>
@@ -130,176 +147,17 @@ function LoginScreen({ onLogin }) {
             style={{ width:"100%", padding:"14px", borderRadius:12, border:"none",
               background:loading||!email||!password?G.g200:G.vert,
               color:loading||!email||!password?G.g400:"#fff",
-              fontSize:15, fontWeight:700, cursor:loading?"wait":"pointer",
-              boxShadow:!loading&&email&&password?`0 6px 20px ${G.vert}44`:"none" }}>
+              fontSize:15, fontWeight:700, cursor:loading?"wait":"pointer" }}>
             {loading ? "Connexion…" : "Se connecter →"}
           </button>
         </form>
-        <div style={{ textAlign:"center", fontSize:12, color:G.g400, marginTop:16 }}>
-          Démo : admin@mavillesaine.fr / Admin123!
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal SUPERVISEURS (admin uniquement) ─────────────────────
-
-function ModalSuperviseurs({ onClose }) {
-  const [liste, setListe]       = useState([]);
-  const [communes, setCommunes] = useState([]);
-  const [form, setForm]         = useState({ nom:"", email:"", password:"", commune_id:"" });
-  const [loading, setLoading]   = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
-
-  useEffect(() => {
-    const charger = async () => {
-      try {
-        const [supRes, comRes] = await Promise.all([
-          api.get("/superviseurs"),
-          api.get("/communes"),
-        ]);
-        setListe(supRes.data || []);
-        setCommunes(comRes.data || []);
-      } catch (err) {
-        toast.error("Erreur chargement : " + (err.response?.data?.error || err.message));
-      } finally { setLoadingData(false); }
-    };
-    charger();
-  }, []);
-
-  const handleAjouter = async () => {
-    if (!form.nom.trim() || !form.email.trim() || !form.password.trim()) {
-      toast.error("Nom, email et mot de passe obligatoires"); return;
-    }
-    setLoading(true);
-    try {
-      const { data } = await api.post("/superviseurs", form);
-      setListe(p => [...p, data]);
-      setForm({ nom:"", email:"", password:"", commune_id:"" });
-      toast.success("Superviseur créé !");
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Erreur création");
-    } finally { setLoading(false); }
-  };
-
-  const handleSupprimer = async (id, nom) => {
-    if (!window.confirm(`Supprimer ${nom} ?`)) return;
-    try {
-      await api.delete(`/superviseurs/${id}`);
-      setListe(p => p.filter(s => s.id !== id));
-      toast.success("Superviseur supprimé");
-    } catch { toast.error("Erreur suppression"); }
-  };
-
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:500,
-      display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(3px)" }}>
-      <div style={{ background:"#fff", borderRadius:20, width:580, maxHeight:"88vh",
-        overflowY:"auto", boxShadow:"0 32px 80px rgba(0,0,0,0.3)" }}>
-        <div style={{ background:G.g900, borderRadius:"20px 20px 0 0", padding:"18px 24px",
-          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ fontSize:16, fontWeight:800, color:"#fff" }}>👥 Gestion des superviseurs</div>
-          <div onClick={onClose} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:20 }}>✕</div>
-        </div>
-        <div style={{ padding:22 }}>
-          <div style={{ background:G.g50, borderRadius:14, padding:18, marginBottom:20, border:`1px solid ${G.g200}` }}>
-            <div style={{ fontSize:14, fontWeight:700, color:G.g900, marginBottom:14 }}>➕ Nouveau superviseur</div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
-              <div style={{ gridColumn:"1/-1" }}>
-                <div style={{ fontSize:12, fontWeight:600, color:G.g700, marginBottom:5 }}>Nom complet *</div>
-                <input type="text" value={form.nom}
-                  onChange={e=>setForm(p=>({...p,nom:e.target.value}))}
-                  placeholder="Marie Dupont"
-                  style={{ width:"100%", padding:"10px 12px", borderRadius:9, border:`2px solid ${G.g200}`,
-                    fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
-                  onFocus={e=>e.target.style.borderColor=G.vert}
-                  onBlur={e=>e.target.style.borderColor=G.g200}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize:12, fontWeight:600, color:G.g700, marginBottom:5 }}>Email *</div>
-                <input type="email" value={form.email}
-                  onChange={e=>setForm(p=>({...p,email:e.target.value}))}
-                  placeholder="m.dupont@mairie.fr"
-                  style={{ width:"100%", padding:"10px 12px", borderRadius:9, border:`2px solid ${G.g200}`,
-                    fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
-                  onFocus={e=>e.target.style.borderColor=G.vert}
-                  onBlur={e=>e.target.style.borderColor=G.g200}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize:12, fontWeight:600, color:G.g700, marginBottom:5 }}>Mot de passe *</div>
-                <input type="password" value={form.password}
-                  onChange={e=>setForm(p=>({...p,password:e.target.value}))}
-                  placeholder="••••••••"
-                  style={{ width:"100%", padding:"10px 12px", borderRadius:9, border:`2px solid ${G.g200}`,
-                    fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
-                  onFocus={e=>e.target.style.borderColor=G.vert}
-                  onBlur={e=>e.target.style.borderColor=G.g200}
-                />
-              </div>
-              <div style={{ gridColumn:"1/-1" }}>
-                <div style={{ fontSize:12, fontWeight:600, color:G.g700, marginBottom:5 }}>Commune</div>
-                <select value={form.commune_id} onChange={e=>setForm(p=>({...p,commune_id:e.target.value}))}
-                  style={{ width:"100%", padding:"10px 12px", borderRadius:9, border:`2px solid ${G.g200}`,
-                    fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:"#fff" }}>
-                  <option value="">— Sélectionner —</option>
-                  {communes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </select>
-              </div>
-            </div>
-            <button onClick={handleAjouter} disabled={loading}
-              style={{ width:"100%", padding:"12px", borderRadius:10, border:"none",
-                background:loading?G.g200:G.vert, color:loading?G.g400:"#fff",
-                fontSize:13, fontWeight:700, cursor:loading?"wait":"pointer" }}>
-              {loading ? "Création…" : "➕ Créer le superviseur"}
-            </button>
-          </div>
-
-          <div style={{ fontSize:14, fontWeight:700, color:G.g900, marginBottom:12 }}>
-            Superviseurs ({liste.length})
-          </div>
-          {loadingData ? (
-            <div style={{ textAlign:"center", padding:24, color:G.g400 }}>Chargement…</div>
-          ) : liste.length === 0 ? (
-            <div style={{ textAlign:"center", padding:24, color:G.g400, fontSize:13 }}>
-              Aucun superviseur — créez-en un ci-dessus
-            </div>
-          ) : liste.map(s => (
-            <div key={s.id} style={{ background:"#fff", borderRadius:12, padding:"13px 14px",
-              marginBottom:10, border:`1px solid ${G.g200}`, display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:40, height:40, background:G.vert, borderRadius:12,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                color:"#fff", fontSize:16, fontWeight:800, flexShrink:0 }}>
-                {s.nom?.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:G.g900 }}>{s.nom}</div>
-                <div style={{ fontSize:12, color:G.g500 }}>{s.email}</div>
-                <div style={{ fontSize:11, color:G.g400 }}>
-                  {s.communes?.nom || "Aucune commune assignée"}
-                </div>
-              </div>
-              {s.role !== "admin" && (
-                <button onClick={()=>handleSupprimer(s.id, s.nom)}
-                  style={{ padding:"6px 12px", borderRadius:8, border:"1px solid #fca5a5",
-                    background:"#fef2f2", color:"#dc2626", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                  🗑️
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
 }
 
 // ── Modal TECHNICIENS ─────────────────────────────────────────
-
-function ModalTechniciens({ techniciens, onSave, onClose }) {
-  const [liste, setListe]   = useState([...techniciens]);
+function ModalTechniciens({ communeId, techniciens, setTechniciens, onClose }) {
   const [form, setForm]     = useState({ nom:"", specialite:"", telephone:"", email:"", couleur:"#2563eb" });
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -310,27 +168,39 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
     setLoading(true);
     try {
       if (editId) {
-        const { data } = await api.put(`/techniciens/${editId}`, form);
-        setListe(p => p.map(t => t.id===editId ? data : t));
+        const { data, error } = await supabase
+          .from("techniciens")
+          .update({ ...form })
+          .eq("id", editId)
+          .select()
+          .single();
+        if (error) throw error;
+        setTechniciens(p => p.map(t => t.id===editId ? data : t));
         setEditId(null);
       } else {
-        const { data } = await api.post("/techniciens", form);
-        setListe(p => [...p, data]);
+        const { data, error } = await supabase
+          .from("techniciens")
+          .insert([{ ...form, commune_id: communeId }])
+          .select()
+          .single();
+        if (error) throw error;
+        setTechniciens(p => [...p, data]);
       }
       setForm({ nom:"", specialite:"", telephone:"", email:"", couleur:"#2563eb" });
       toast.success(editId ? "Technicien modifié" : "Technicien ajouté");
     } catch (err) {
-      toast.error(err.response?.data?.error || "Erreur");
+      toast.error("Erreur : " + err.message);
     } finally { setLoading(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer ce technicien ?")) return;
     try {
-      await api.delete(`/techniciens/${id}`);
-      setListe(p => p.filter(t => t.id!==id));
+      const { error } = await supabase.from("techniciens").delete().eq("id", id);
+      if (error) throw error;
+      setTechniciens(p => p.filter(t => t.id!==id));
       toast.success("Technicien supprimé");
-    } catch { toast.error("Erreur lors de la suppression"); }
+    } catch (err) { toast.error("Erreur : " + err.message); }
   };
 
   return (
@@ -395,14 +265,14 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
             </div>
           </div>
           <div style={{ fontSize:14, fontWeight:700, color:G.g900, marginBottom:12 }}>
-            Techniciens ({liste.length})
+            Techniciens ({techniciens.length})
           </div>
-          {liste.length === 0 && (
+          {techniciens.length === 0 && (
             <div style={{ textAlign:"center", padding:"24px", color:G.g400, fontSize:13 }}>
               Aucun technicien — ajoutez-en un ci-dessus
             </div>
           )}
-          {liste.map(t => (
+          {techniciens.map(t => (
             <div key={t.id} style={{ background:"#fff", borderRadius:12, padding:"13px 14px",
               marginBottom:10, border:`1px solid ${G.g200}`, display:"flex", alignItems:"center", gap:12 }}>
               <div style={{ width:40, height:40, background:t.couleur||"#64748b", borderRadius:12,
@@ -425,7 +295,7 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
               </div>
             </div>
           ))}
-          <button onClick={()=>onSave(liste)}
+          <button onClick={onClose}
             style={{ width:"100%", padding:"14px", borderRadius:12, border:"none",
               background:G.g900, color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:8 }}>
             ✓ Fermer
@@ -437,7 +307,6 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
 }
 
 // ── Panneau DÉTAIL ────────────────────────────────────────────
-
 function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const [telLibre, setTelLibre]         = useState("");
   const [modeEnvoi, setModeEnvoi]       = useState("tech");
@@ -452,22 +321,49 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const updateStatut = async (statut) => {
     setLoadingStatut(true);
     try {
-      const { data } = await api.patch(`/signalements/${sig.id}`, { statut });
-      onUpdate(data.signalement);
-      toast.success(`Statut mis à jour : ${STATUTS[statut].label}`);
-    } catch { toast.error("Erreur lors de la mise à jour"); }
+      const { data, error } = await supabase
+        .from("signalements")
+        .update({ statut, updated_at: new Date().toISOString() })
+        .eq("id", sig.id)
+        .select()
+        .single();
+      if (error) throw error;
+      onUpdate(data);
+      toast.success(`Statut : ${STATUTS[statut].label}`);
+
+      // Notifier le citoyen via push si token disponible
+      if (sig.expo_push_token) {
+        const messages = {
+          en_cours: { title:"🔧 Signalement pris en charge", body:`Votre signalement ${sig.ref} est en cours de traitement.` },
+          resolu:   { title:"✅ Signalement résolu !", body:`Votre signalement ${sig.ref} a été résolu. Merci !` },
+        };
+        if (messages[statut]) {
+          fetch("https://exp.host/--/api/v2/push/send", {
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ to: sig.expo_push_token, ...messages[statut] })
+          }).catch(() => {});
+        }
+      }
+    } catch (err) { toast.error("Erreur : " + err.message); }
     finally { setLoadingStatut(false); }
   };
 
   const updateUrgence = async (urgence) => {
     try {
-      const { data } = await api.patch(`/signalements/${sig.id}`, { urgence });
-      onUpdate(data.signalement);
+      const { data, error } = await supabase
+        .from("signalements")
+        .update({ urgence })
+        .eq("id", sig.id)
+        .select()
+        .single();
+      if (error) throw error;
+      onUpdate(data);
       toast.success("Urgence mise à jour");
-    } catch { toast.error("Erreur"); }
+    } catch (err) { toast.error("Erreur : " + err.message); }
   };
 
-  const genererEtEnvoyer = async () => {
+  const genererPDF = async () => {
     setLoadingPDF(true);
     try {
       if (!window.jspdf) {
@@ -489,7 +385,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.setTextColor(180,180,180);
       doc.text(`Généré le ${new Date().toLocaleDateString("fr-FR")}`,M,29);
       doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("helvetica","bold");
-      doc.text(sig.ref,W-M,16,{align:"right"});
+      doc.text(sig.ref||"",W-M,16,{align:"right"});
 
       let y=48;
       const urgColors={normal:[22,163,74],genant:[180,83,9],dangereux:[220,38,38]};
@@ -507,7 +403,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.text(sig.adresse||"",M+4,y+14);
       doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(100,116,139);
       doc.text(`Catégorie : ${cat.label}   |   Date : ${sig.created_at?.slice(0,10)}   |   Votes : ${sig.votes||0}`,M+4,y+21);
-      doc.text(`GPS : ${sig.latitude}, ${sig.longitude}`,M+4,y+27);
+      if (sig.latitude) doc.text(`GPS : ${sig.latitude}, ${sig.longitude}`,M+4,y+27);
       y+=36;
 
       if (sig.description) {
@@ -524,16 +420,13 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.text("PHOTOS",M,y+5); y+=10;
       const pW=(W-M*2-6)/2, pH=55;
       for (let i=0;i<2;i++) {
-        const photoUrl = i===0 ? sig.photo_detail_url : sig.photo_large_url;
         doc.setFillColor(241,245,249); doc.rect(M+i*(pW+6),y,pW,pH,"F");
         doc.setDrawColor(226,232,240); doc.rect(M+i*(pW+6),y,pW,pH,"S");
         doc.setFillColor(0,0,0); doc.rect(M+i*(pW+6),y+pH-8,pW,8,"F");
         doc.setTextColor(255,255,255); doc.setFontSize(7);
         doc.text(i===0?"Photo détail":"Vue d'ensemble",M+i*(pW+6)+3,y+pH-3);
-        if (!photoUrl) {
-          doc.setTextColor(148,163,184); doc.setFontSize(8);
-          doc.text(i===0?"Photo détail":"Vue large",M+i*(pW+6)+pW/2,y+pH/2,{align:"center"});
-        }
+        doc.setTextColor(148,163,184); doc.setFontSize(8);
+        doc.text(i===0?"Voir app":"Voir app",M+i*(pW+6)+pW/2,y+pH/2,{align:"center"});
       }
       y+=pH+10;
 
@@ -549,48 +442,21 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         if (tech.specialite) doc.text(`Spécialité : ${tech.specialite}`,M+4,y+20);
         doc.text([tech.telephone,tech.email].filter(Boolean).join("   |   "),M+4,y+26);
         y+=36;
-      } else if (telLibre) {
-        doc.setFillColor(232,245,238); doc.rect(M,y,W-M*2,20,"F");
-        doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont("helvetica","bold");
-        doc.text(`Destinataire : ${telLibre}`,M+4,y+12);
-        y+=26;
       }
-
-      doc.setFillColor(255,255,255); doc.rect(M,y,W-M*2,34,"F");
-      doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,34,"S");
-      doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-      doc.text("ACTIONS À RÉALISER",M+4,y+6);
-      ["☐  Vérifier et sécuriser le site","☐  Réaliser les travaux nécessaires",
-       "☐  Documenter l'intervention","☐  Mettre à jour le statut dans MaVilleSaine"].forEach((l,i)=>{
-        doc.setTextColor(51,65,85); doc.setFontSize(8); doc.setFont("helvetica","normal");
-        doc.text(l,M+4,y+13+i*5);
-      });
-      y+=40;
-
-      doc.setFillColor(248,250,252); doc.rect(M,y,W-M*2,28,"F");
-      doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,28,"S");
-      const cW=(W-M*2)/3;
-      ["Superviseur","Technicien","Date d'intervention"].forEach((l,i)=>{
-        doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-        doc.text(l.toUpperCase(),M+4+i*cW,y+6);
-        doc.setDrawColor(203,213,225);
-        doc.line(M+4+i*cW,y+20,M+4+i*cW+cW-8,y+20);
-      });
 
       doc.setFillColor(10,22,40); doc.rect(0,282,W,15,"F");
       doc.setTextColor(100,100,100); doc.setFontSize(7);
       doc.text("MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr",W/2,291,{align:"center"});
-
-      doc.save(`bon-intervention-${sig.ref}.pdf`);
+      doc.save(`bon-intervention-${sig.ref||"mvs"}.pdf`);
       setShowEnvoi(true);
-      toast.success("PDF généré avec succès !");
+      toast.success("PDF généré !");
     } catch(err) {
-      toast.error("Erreur lors de la génération du PDF : " + err.message);
+      toast.error("Erreur PDF : " + err.message);
     } finally { setLoadingPDF(false); }
   };
 
   const destinataire = modeEnvoi==="tech" ? selectedTech : (telLibre ? { nom:null, tel:telLibre } : null);
-  const msgTexte = `🔧 BON D'INTERVENTION ${sig.ref}\n📍 ${sig.adresse}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)}\n👷 ${destinataire?.nom||telLibre||"Non assigné"}\n📝 ${sig.description||"Aucune description"}\n🌐 MaVilleSaine`;
+  const msgTexte = `🔧 BON D'INTERVENTION ${sig.ref||""}\n📍 ${sig.adresse||""}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||""}\n👷 ${destinataire?.nom||telLibre||"Non assigné"}\n📝 ${sig.description||"Aucune description"}\n🌐 MaVilleSaine`;
   const tel = (destinataire?.telephone||destinataire?.tel||"").replace(/\s/g,"").replace(/^0/,"+33");
 
   return (
@@ -598,8 +464,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:200, backdropFilter:"blur(2px)" }}/>
       <div style={{ position:"fixed", top:0, right:0, bottom:0, width:"min(700px,94vw)", background:"#fff",
         zIndex:201, display:"flex", flexDirection:"column", boxShadow:"-8px 0 40px rgba(0,0,0,0.2)",
-        animation:"slideIn 0.22s ease-out", fontFamily:"'Outfit',system-ui,sans-serif" }}>
-        <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+        fontFamily:"'Outfit',system-ui,sans-serif" }}>
 
         <div style={{ background:G.g900, padding:"18px 24px", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
           <div style={{ width:46, height:46, background:cat.color+"22", borderRadius:12,
@@ -611,13 +476,15 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:5, alignItems:"flex-end", flexShrink:0 }}>
-            <BadgeUrgence urgence={sig.urgence} ia={sig.urgence_ia}/>
+            <BadgeUrgence urgence={sig.urgence}/>
             <Badge statut={sig.statut}/>
           </div>
-          <div onClick={onClose} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:22, padding:"0 4px", flexShrink:0 }}>✕</div>
+          <div onClick={onClose} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:22, padding:"0 4px" }}>✕</div>
         </div>
 
         <div style={{ flex:1, overflowY:"auto", padding:24 }}>
+
+          {/* Photos */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>Photos</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
@@ -636,24 +503,26 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
 
+          {/* Infos */}
           <div style={{ background:G.g50, borderRadius:14, padding:18, marginBottom:22, border:`1px solid ${G.g200}` }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:14 }}>Informations</div>
             {[
-              {icon:"📍",label:"Adresse",value:sig.adresse},
-              {icon:"📅",label:"Date",value:`${sig.created_at?.slice(0,10)} à ${sig.created_at?.slice(11,16)}`},
-              {icon:"🧭",label:"GPS",value:`${sig.latitude}°N · ${sig.longitude}°E`},
-              {icon:"👍",label:"Confirmations",value:`${sig.votes||0} citoyen${(sig.votes||0)>1?"s":""}${(sig.votes||0)>=5?" — ⚠️ Priorité haute":""}`},
+              {icon:"📍",label:"Adresse",       value:sig.adresse||"—"},
+              {icon:"📅",label:"Date",           value:sig.created_at ? `${sig.created_at.slice(0,10)} à ${sig.created_at.slice(11,16)}` : "—"},
+              {icon:"🧭",label:"GPS",            value:sig.latitude ? `${sig.latitude}°N · ${sig.longitude}°E` : "—"},
+              {icon:"👍",label:"Confirmations",  value:`${sig.votes||0} citoyen${(sig.votes||0)>1?"s":""}${(sig.votes||0)>=5?" — ⚠️ Priorité haute":""}`},
             ].map((it,i)=>(
-              <div key={i} style={{ display:"flex", gap:12, marginBottom:i<3?12:0, alignItems:"flex-start" }}>
+              <div key={i} style={{ display:"flex", gap:12, marginBottom:i<3?12:0 }}>
                 <span style={{ fontSize:16, width:22, flexShrink:0, marginTop:2 }}>{it.icon}</span>
                 <div>
-                  <div style={{ fontSize:11, color:G.g400, fontWeight:600, textTransform:"uppercase", letterSpacing:0.3 }}>{it.label}</div>
+                  <div style={{ fontSize:11, color:G.g400, fontWeight:600, textTransform:"uppercase" }}>{it.label}</div>
                   <div style={{ fontSize:13, color:G.g700, marginTop:2 }}>{it.value}</div>
                 </div>
               </div>
             ))}
           </div>
 
+          {/* Description */}
           {sig.description && (
             <div style={{ marginBottom:22 }}>
               <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Description</div>
@@ -663,16 +532,14 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           )}
 
+          {/* Urgence */}
           <div style={{ marginBottom:22 }}>
-            <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8, display:"flex", alignItems:"center", gap:8 }}>
-              Urgence
-              {sig.urgence_ia && <span style={{ background:"#eff6ff", color:"#2563eb", fontSize:10, fontWeight:600, padding:"2px 7px", borderRadius:8 }}>🤖 IA</span>}
-            </div>
+            <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Urgence</div>
             <div style={{ display:"flex", gap:10 }}>
               {Object.entries(URGENCES).map(([key,u])=>(
                 <div key={key} onClick={()=>updateUrgence(key)}
                   style={{ flex:1, padding:"12px 8px", borderRadius:12, border:`2px solid ${sig.urgence===key?u.border:G.g200}`,
-                    background:sig.urgence===key?u.bg:"#fff", cursor:"pointer", textAlign:"center", transition:"all 0.15s" }}>
+                    background:sig.urgence===key?u.bg:"#fff", cursor:"pointer", textAlign:"center" }}>
                   <div style={{ fontSize:22, marginBottom:4 }}>{u.icon}</div>
                   <div style={{ fontSize:12, fontWeight:700, color:sig.urgence===key?u.color:G.g500 }}>{u.label}</div>
                 </div>
@@ -680,6 +547,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
 
+          {/* Statut */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Statut</div>
             <div style={{ display:"flex", gap:10 }}>
@@ -687,40 +555,37 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                 <button key={key} onClick={()=>!loadingStatut&&updateStatut(key)}
                   style={{ flex:1, padding:"12px 8px", borderRadius:12, border:`2px solid ${sig.statut===key?s.dot:G.g200}`,
                     background:sig.statut===key?s.bg:"#fff", color:sig.statut===key?s.color:G.g500,
-                    fontSize:13, fontWeight:700, cursor:"pointer", transition:"all 0.15s" }}>
+                    fontSize:13, fontWeight:700, cursor:"pointer" }}>
                   {s.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Technicien */}
           <div style={{ marginBottom:22 }}>
-            <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>
-              Assigner / Envoyer à
-            </div>
+            <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>Assigner / Envoyer à</div>
             <div style={{ display:"flex", background:G.g100, borderRadius:10, padding:"3px", marginBottom:14 }}>
-              {[["tech","👷 Technicien enregistré"],["libre","📱 Numéro libre"]].map(([id,label])=>(
+              {[["tech","👷 Technicien"],["libre","📱 Numéro libre"]].map(([id,label])=>(
                 <div key={id} onClick={()=>setModeEnvoi(id)}
                   style={{ flex:1, padding:"8px", textAlign:"center", borderRadius:8, cursor:"pointer",
                     background:modeEnvoi===id?"#fff":"transparent", color:modeEnvoi===id?G.g900:G.g500,
-                    fontSize:12, fontWeight:600, transition:"all 0.15s",
-                    boxShadow:modeEnvoi===id?"0 1px 4px rgba(0,0,0,0.1)":"none" }}>
+                    fontSize:12, fontWeight:600, boxShadow:modeEnvoi===id?"0 1px 4px rgba(0,0,0,0.1)":"none" }}>
                   {label}
                 </div>
               ))}
             </div>
-
             {modeEnvoi==="tech" && (
               techniciens.length===0
                 ? <div style={{ background:"#fffbeb", borderRadius:12, padding:16, border:"1px solid #fcd34d", textAlign:"center", fontSize:13, color:"#92400e" }}>
-                    Aucun technicien — utilisez le bouton "Gérer les techniciens"
+                    Aucun technicien — ajoutez-en via "Techniciens"
                   </div>
                 : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                     {techniciens.map(t=>(
                       <div key={t.id} onClick={()=>setSelectedTech(selectedTech?.id===t.id?null:t)}
                         style={{ background:selectedTech?.id===t.id?G.vertClair:"#fff",
                           border:`2px solid ${selectedTech?.id===t.id?G.vert:G.g200}`,
-                          borderRadius:12, padding:"13px 14px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", transition:"all 0.15s" }}>
+                          borderRadius:12, padding:"13px 14px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
                         <div style={{ width:40, height:40, background:selectedTech?.id===t.id?G.vert:(t.couleur||"#64748b"),
                           borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center",
                           color:"#fff", fontSize:16, fontWeight:800, flexShrink:0 }}>
@@ -736,44 +601,34 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                     ))}
                   </div>
             )}
-
             {modeEnvoi==="libre" && (
               <div style={{ background:"#fff", borderRadius:12, padding:16, border:`1px solid ${G.g200}` }}>
                 <div style={{ fontSize:13, fontWeight:600, color:G.g700, marginBottom:6 }}>Numéro de téléphone</div>
-                <div style={{ fontSize:12, color:G.g400, marginBottom:10, lineHeight:1.5 }}>
-                  Envoyez à n'importe quel numéro, même sans technicien enregistré.
-                </div>
-                <input type="tel" value={telLibre} onChange={e=>setTelLibre(e.target.value)}
-                  placeholder="06 00 00 00 00"
+                <input type="tel" value={telLibre} onChange={e=>setTelLibre(e.target.value)} placeholder="06 00 00 00 00"
                   style={{ width:"100%", padding:"12px 14px", borderRadius:10, border:`2px solid ${telLibre?G.vert:G.g200}`,
-                    fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
-                  onFocus={e=>e.target.style.borderColor=G.vert}
-                  onBlur={e=>e.target.style.borderColor=telLibre?G.vert:G.g200}
-                />
-                {telLibre && <div style={{ fontSize:12, color:G.vert, marginTop:8, fontWeight:600 }}>✓ Numéro prêt</div>}
+                    fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}/>
               </div>
             )}
           </div>
         </div>
 
         <div style={{ padding:"16px 24px", borderTop:`1px solid ${G.g200}`, background:"#fff", flexShrink:0 }}>
-          <button onClick={genererEtEnvoyer} disabled={loadingPDF}
+          <button onClick={genererPDF} disabled={loadingPDF}
             style={{ width:"100%", padding:16, borderRadius:14, border:"none",
               background:loadingPDF?G.g200:G.g900, color:loadingPDF?G.g400:"#fff",
               fontSize:15, fontWeight:700, cursor:loadingPDF?"wait":"pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
-            {loadingPDF ? <><span style={{ width:18, height:18, borderRadius:"50%", border:"2px solid #94a3b8", borderTopColor:"transparent", display:"inline-block", animation:"spin 0.7s linear infinite" }}/> Génération…</> : "🚧 Générer le bon d'intervention & Envoyer"}
+            {loadingPDF ? "Génération…" : "🚧 Générer le bon d'intervention & Envoyer"}
           </button>
         </div>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {showEnvoi && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000,
           display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div style={{ background:"#fff", borderRadius:20, width:500, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 32px 80px rgba(0,0,0,0.4)" }}>
             <div style={{ background:G.g900, borderRadius:"20px 20px 0 0", padding:"18px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ fontSize:16, fontWeight:800, color:"#fff" }}>📤 Envoyer le bon d'intervention</div>
+              <div style={{ fontSize:16, fontWeight:800, color:"#fff" }}>📤 Envoyer le bon</div>
               <div onClick={()=>setShowEnvoi(false)} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:20 }}>✕</div>
             </div>
             <div style={{ padding:22 }}>
@@ -784,29 +639,20 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                   <div style={{ fontSize:11, color:G.g500 }}>bon-intervention-{sig.ref}.pdf — téléchargé</div>
                 </div>
               </div>
-              <div style={{ fontSize:13, fontWeight:700, color:G.g700, marginBottom:12 }}>Envoyer via :</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                 {[
-                  {label:"Email",     icon:"📧", color:"#2563eb", action:()=>window.open(`mailto:${destinataire?.email||""}?subject=Bon d'intervention ${sig.ref}&body=${encodeURIComponent(msgTexte)}`)},
-                  {label:"SMS",       icon:"💬", color:"#16a34a", action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
-                  {label:"WhatsApp",  icon:"🟢", color:"#25D366", action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Telegram",  icon:"✈️", color:"#2AABEE", action:()=>window.open(`https://t.me/share/url?url=mavillesaine.fr&text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Messenger", icon:"💙", color:"#0084FF", action:()=>window.open(`https://m.me/?text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Copier",    icon:"📋", color:"#64748b", action:()=>{navigator.clipboard?.writeText(msgTexte);toast.success("Copié !");}},
+                  {label:"Email",    icon:"📧", action:()=>window.open(`mailto:${destinataire?.email||""}?subject=Bon ${sig.ref}&body=${encodeURIComponent(msgTexte)}`)},
+                  {label:"SMS",      icon:"💬", action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
+                  {label:"WhatsApp", icon:"🟢", action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
+                  {label:"Copier",   icon:"📋", action:()=>{navigator.clipboard?.writeText(msgTexte);toast.success("Copié !");}},
                 ].map(c=>(
                   <div key={c.label} onClick={c.action}
                     style={{ background:"#fff", border:`2px solid ${G.g200}`, borderRadius:12, padding:"12px 14px",
-                      display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"all 0.15s" }}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor=c.color;e.currentTarget.style.background=c.color+"0a";}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=G.g200;e.currentTarget.style.background="#fff";}}>
+                      display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
                     <span style={{ fontSize:20 }}>{c.icon}</span>
                     <div style={{ fontSize:13, fontWeight:700, color:G.g900 }}>{c.label}</div>
-                    <div style={{ marginLeft:"auto", fontSize:14, color:G.g300 }}>›</div>
                   </div>
                 ))}
-              </div>
-              <div style={{ fontSize:11, color:G.g400, marginTop:12, textAlign:"center", lineHeight:1.5 }}>
-                SMS et WhatsApp ouvrent votre app native avec le message pré-rempli.
               </div>
             </div>
           </div>
@@ -816,44 +662,72 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   );
 }
 
-// ── APPLICATION BACK-OFFICE ───────────────────────────────────
-
+// ── APPLICATION PRINCIPALE ────────────────────────────────────
 export default function BackOffice() {
-  const [user, setUser] = useState(() => {
-    const u = localStorage.getItem("mvp_user");
-    return u ? JSON.parse(u) : null;
-  });
+  const [user, setUser]                   = useState(null);
   const [signalements, setSignalements]   = useState([]);
   const [techniciens, setTechniciens]     = useState([]);
-  const [stats, setStats]                 = useState(null);
   const [selected, setSelected]           = useState(null);
   const [filterStatut, setFilterStatut]   = useState("tous");
   const [filterCat, setFilterCat]         = useState("tous");
   const [filterUrgence, setFilterUrgence] = useState("tous");
   const [showTech, setShowTech]           = useState(false);
-  const [showSuperviseurs, setShowSuperviseurs] = useState(false);
   const [loading, setLoading]             = useState(false);
+
+  // Vérifier session au démarrage
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const { data: sup } = await supabase
+          .from("superviseurs")
+          .select("id, nom, email, role, commune_id, actif, communes(nom, couleur)")
+          .eq("id", session.user.id)
+          .single();
+        if (sup?.actif) setUser(sup);
+        else supabase.auth.signOut();
+      }
+    });
+  }, []);
 
   const charger = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [sigRes, techRes, statsRes] = await Promise.all([
-        api.get("/signalements" + (user.role !== "admin" && user.commune_id ? `?commune_id=${user.commune_id}` : "")),
-        api.get("/techniciens"),
-        api.get("/stats"),
-      ]);
-      setSignalements(sigRes.data.signalements || []);
-      setTechniciens(techRes.data || []);
-      setStats(statsRes.data);
+      // Signalements filtrés par commune du superviseur
+      let query = supabase
+        .from("signalements")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (user.role !== "admin") {
+        query = query.eq("commune_id", user.commune_id);
+      }
+
+      const { data: sigs, error: sigError } = await query;
+      if (sigError) throw sigError;
+      setSignalements(sigs || []);
+
+      // Techniciens de la commune
+      const { data: techs } = await supabase
+        .from("techniciens")
+        .select("*")
+        .eq("commune_id", user.commune_id);
+      setTechniciens(techs || []);
+
     } catch (err) {
-      toast.error("Erreur de chargement : " + (err.response?.data?.error || err.message));
+      toast.error("Erreur : " + err.message);
     } finally { setLoading(false); }
   }, [user]);
 
   useEffect(() => { charger(); }, [charger]);
 
-  if (!user) return <LoginScreen onLogin={u => { setUser(u); charger(); }} />;
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSignalements([]);
+  };
+
+  if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
 
   const filtered = signalements.filter(s=>
     (filterStatut==="tous"  || s.statut===filterStatut) &&
@@ -862,20 +736,25 @@ export default function BackOffice() {
   ).sort((a,b)=>{
     const scores={dangereux:3,genant:2,normal:1};
     if ((scores[b.urgence]||0)!==(scores[a.urgence]||0)) return (scores[b.urgence]||0)-(scores[a.urgence]||0);
-    return (b.votes||0)-(a.votes||0);
+    return new Date(b.created_at) - new Date(a.created_at);
   });
 
   const selectedSig = signalements.find(s=>s.id===selected);
 
-  const handleUpdate = (updated) => {
-    setSignalements(p => p.map(s => s.id===updated.id ? updated : s));
+  // Stats
+  const now = new Date();
+  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const stats = {
+    total:    signalements.length,
+    recu:     signalements.filter(s=>s.statut==="recu").length,
+    en_cours: signalements.filter(s=>s.statut==="en_cours").length,
+    resolu:   signalements.filter(s=>s.statut==="resolu").length,
+    danger:   signalements.filter(s=>s.urgence==="dangereux").length,
+    ce_mois:  signalements.filter(s=>s.created_at>=debutMois).length,
   };
 
-  const logout = () => {
-    localStorage.removeItem("mvp_token");
-    localStorage.removeItem("mvp_user");
-    setUser(null);
-  };
+  const communeNom = user.communes?.nom || "Ma commune";
+  const communeCouleur = user.communes?.couleur || G.vert;
 
   return (
     <div style={{ width:"100vw", height:"100vh", display:"flex", flexDirection:"column",
@@ -886,20 +765,17 @@ export default function BackOffice() {
       <div style={{ background:G.g900, height:56, padding:"0 24px", display:"flex",
         alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:28, height:28, background:G.vert, borderRadius:8,
+          <div style={{ width:28, height:28, background:communeCouleur, borderRadius:8,
             display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>🏙️</div>
           <span style={{ color:"#fff", fontWeight:800, fontSize:15 }}>MaVilleSaine</span>
           <span style={{ background:"rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.5)",
             fontSize:11, padding:"2px 8px", borderRadius:6 }}>Superviseur</span>
+          <span style={{ background:communeCouleur+"33", color:communeCouleur,
+            fontSize:11, padding:"2px 10px", borderRadius:6, fontWeight:700, border:`1px solid ${communeCouleur}55` }}>
+            📍 {communeNom}
+          </span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          {user.role === "admin" && (
-            <button onClick={()=>setShowSuperviseurs(true)}
-              style={{ background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)",
-                borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-              👥 Superviseurs
-            </button>
-          )}
           <button onClick={()=>setShowTech(true)}
             style={{ background:"rgba(255,255,255,0.1)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)",
               borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
@@ -923,12 +799,12 @@ export default function BackOffice() {
       <div style={{ background:"#fff", padding:"10px 20px", display:"flex", gap:10,
         borderBottom:`1px solid ${G.g200}`, flexShrink:0, overflowX:"auto", alignItems:"center" }}>
         {[
-          {label:"Total",    value:stats?.total||0,    color:G.g700,                 bg:G.g100},
-          {label:"Nouveaux", value:stats?.recu||0,     color:STATUTS.recu.color,     bg:STATUTS.recu.bg},
-          {label:"En cours", value:stats?.en_cours||0, color:STATUTS.en_cours.color, bg:STATUTS.en_cours.bg},
-          {label:"Résolus",  value:stats?.resolu||0,   color:STATUTS.resolu.color,   bg:STATUTS.resolu.bg},
-          {label:"⚠️ Danger",value:stats?.danger||0,   color:"#dc2626",              bg:"#fef2f2"},
-          {label:"Ce mois",  value:stats?.ce_mois||0,  color:"#9333ea",              bg:"#faf5ff"},
+          {label:"Total",    value:stats.total,    color:G.g700,                 bg:G.g100},
+          {label:"Nouveaux", value:stats.recu,     color:STATUTS.recu.color,     bg:STATUTS.recu.bg},
+          {label:"En cours", value:stats.en_cours, color:STATUTS.en_cours.color, bg:STATUTS.en_cours.bg},
+          {label:"Résolus",  value:stats.resolu,   color:STATUTS.resolu.color,   bg:STATUTS.resolu.bg},
+          {label:"⚠️ Danger",value:stats.danger,   color:"#dc2626",              bg:"#fef2f2"},
+          {label:"Ce mois",  value:stats.ce_mois,  color:"#9333ea",              bg:"#faf5ff"},
         ].map((s,i)=>(
           <div key={i} style={{ background:s.bg, borderRadius:10, padding:"7px 14px",
             display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
@@ -951,7 +827,7 @@ export default function BackOffice() {
         </div>
       </div>
 
-      {/* Contenu */}
+      {/* Liste signalements */}
       <div style={{ flex:1, overflow:"hidden", minHeight:0, overflowY:"auto" }}>
         {loading && signalements.length===0 ? (
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", gap:12 }}>
@@ -983,29 +859,26 @@ export default function BackOffice() {
                   <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
                     <CatIcon id={sig.categorie} size={42}/>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                        marginBottom:4, gap:6, flexWrap:"wrap" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4, gap:6, flexWrap:"wrap" }}>
                         <div style={{ fontSize:14, fontWeight:700, color:G.g900 }}>{cat.label}</div>
                         <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
-                          <BadgeUrgence urgence={sig.urgence} ia={sig.urgence_ia}/>
+                          <BadgeUrgence urgence={sig.urgence}/>
                           <Badge statut={sig.statut}/>
                         </div>
                       </div>
-                      <div style={{ fontSize:12, color:G.g500, marginBottom:4,
-                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      <div style={{ fontSize:12, color:G.g500, marginBottom:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                         📍 {sig.adresse}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:12, fontSize:12, color:G.g400 }}>
-                        <span>{sig.ref} · {sig.created_at?.slice(0,10)} {sig.created_at?.slice(11,16)}</span>
+                        <span>{sig.ref} · {sig.created_at?.slice(0,10)}</span>
                         {(sig.votes||0)>0 && (
-                          <span style={{ background:"#fef3c7", color:"#92400e",
-                            padding:"1px 7px", borderRadius:10, fontWeight:700, fontSize:11 }}>
+                          <span style={{ background:"#fef3c7", color:"#92400e", padding:"1px 7px", borderRadius:10, fontWeight:700, fontSize:11 }}>
                             👍 {sig.votes}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div style={{ color:G.g300, fontSize:18, flexShrink:0, alignSelf:"center" }}>›</div>
+                    <div style={{ color:G.g400, fontSize:18, flexShrink:0, alignSelf:"center" }}>›</div>
                   </div>
                 </div>
               );
@@ -1019,20 +892,17 @@ export default function BackOffice() {
           sig={selectedSig}
           techniciens={techniciens}
           onClose={()=>setSelected(null)}
-          onUpdate={handleUpdate}
+          onUpdate={updated => setSignalements(p => p.map(s => s.id===updated.id ? updated : s))}
         />
       )}
 
       {showTech && (
         <ModalTechniciens
+          communeId={user.commune_id}
           techniciens={techniciens}
-          onSave={liste=>{ setTechniciens(liste); setShowTech(false); }}
+          setTechniciens={setTechniciens}
           onClose={()=>setShowTech(false)}
         />
-      )}
-
-      {showSuperviseurs && user.role === "admin" && (
-        <ModalSuperviseurs onClose={()=>setShowSuperviseurs(false)} />
       )}
     </div>
   );
