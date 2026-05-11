@@ -839,7 +839,7 @@ export default function BackOffice() {
     setLoading(true);
     try {
       const [sigRes, techRes, statsRes] = await Promise.all([
-        api.get("/signalements"),
+        api.get("/signalements" + (user.role !== "admin" && user.commune_id ? `?commune_id=${user.commune_id}` : "")),
         api.get("/techniciens"),
         api.get("/stats"),
       ]);
