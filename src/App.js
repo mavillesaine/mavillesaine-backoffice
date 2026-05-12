@@ -420,19 +420,20 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.text("PHOTOS",M,y+5); y+=10;
       const pW=(W-M*2-6)/2, pH=65;
 
-      // Convertir une URL image en base64 pour jsPDF
-      const toBase64 = async (url) => {
-        try {
-          const resp = await fetch(url);
-          const blob = await resp.blob();
-          return await new Promise((res, rej) => {
-            const reader = new FileReader();
-            reader.onload = () => res(reader.result);
-            reader.onerror = rej;
-            reader.readAsDataURL(blob);
-          });
-        } catch { return null; }
-      };
+      // Convertir une URL image en base64 via canvas (contourne CORS)
+      const toBase64 = (url) => new Promise((resolve) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width  = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d").drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.onerror = () => resolve(null);
+        img.src = url + "?t=" + Date.now(); // cache-buster
+      });
 
       const photos = [
         { url: sig.photo_detail_url, label: "Photo détail" },
