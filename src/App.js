@@ -504,7 +504,24 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
 <div class="footer">MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr</div>
 
-<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer PDF</button>
+<div class="no-print" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;z-index:100;">
+  <button onclick="window.print()" style="background:#0f172a;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:8px;">
+    🖨️ Imprimer / PDF
+  </button>
+  <button onclick="window.location.href='mailto:${tech ? tech.email || '' : ''}?subject=Bon%20d%27intervention%20${sig.ref||''}&body=' + encodeURIComponent(document.title)" style="background:#2563eb;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
+    📧 Email
+  </button>
+  <button onclick="window.location.href='sms:${tech ? (tech.telephone||'').replace(/\s/g,'').replace(/^0/,'+33') : ''}?body=' + encodeURIComponent('🔧 BON INTERVENTION ${sig.ref||\'\'}\n📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine')" style="background:#16a34a;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
+    💬 SMS
+  </button>
+  <button onclick="window.open('https://wa.me/${tech ? (tech.telephone||'').replace(/\s/g,'').replace(/^0/,'+33') : ''}?text=' + encodeURIComponent('🔧 BON INTERVENTION ${sig.ref||\'\'}\n📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine'))" style="background:#25D366;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
+    🟢 WhatsApp
+  </button>
+  <button onclick="navigator.clipboard.writeText('🔧 BON INTERVENTION ${sig.ref||\'\'}
+📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine').then(()=>alert('Copié !'))" style="background:#64748b;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
+    📋 Copier
+  </button>
+</div>
 
 </body>
 </html>`;
