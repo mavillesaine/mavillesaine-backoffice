@@ -418,15 +418,47 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
       doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
       doc.text("PHOTOS",M,y+5); y+=10;
-      const pW=(W-M*2-6)/2, pH=55;
-      for (let i=0;i<2;i++) {
-        doc.setFillColor(241,245,249); doc.rect(M+i*(pW+6),y,pW,pH,"F");
-        doc.setDrawColor(226,232,240); doc.rect(M+i*(pW+6),y,pW,pH,"S");
-        doc.setFillColor(0,0,0); doc.rect(M+i*(pW+6),y+pH-8,pW,8,"F");
+      const pW=(W-M*2-6)/2, pH=65;
+
+      // Convertir une URL image en base64 pour jsPDF
+      const toBase64 = async (url) => {
+        try {
+          const resp = await fetch(url);
+          const blob = await resp.blob();
+          return await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result);
+            reader.onerror = rej;
+            reader.readAsDataURL(blob);
+          });
+        } catch { return null; }
+      };
+
+      const photos = [
+        { url: sig.photo_detail_url, label: "Photo détail" },
+        { url: sig.photo_large_url,  label: "Vue d'ensemble" },
+      ];
+
+      for (let i = 0; i < 2; i++) {
+        const x = M + i * (pW + 6);
+        doc.setFillColor(241,245,249); doc.rect(x,y,pW,pH,"F");
+        doc.setDrawColor(226,232,240); doc.rect(x,y,pW,pH,"S");
+
+        if (photos[i].url) {
+          const b64 = await toBase64(photos[i].url);
+          if (b64) {
+            try {
+              doc.addImage(b64, "JPEG", x+1, y+1, pW-2, pH-10);
+            } catch { /* image non supportée */ }
+          }
+        } else {
+          doc.setTextColor(148,163,184); doc.setFontSize(8);
+          doc.text("Photo non disponible", x+pW/2, y+pH/2, {align:"center"});
+        }
+
+        doc.setFillColor(0,0,0); doc.rect(x, y+pH-9, pW, 9, "F");
         doc.setTextColor(255,255,255); doc.setFontSize(7);
-        doc.text(i===0?"Photo détail":"Vue d'ensemble",M+i*(pW+6)+3,y+pH-3);
-        doc.setTextColor(148,163,184); doc.setFontSize(8);
-        doc.text(i===0?"Voir app":"Voir app",M+i*(pW+6)+pW/2,y+pH/2,{align:"center"});
+        doc.text(photos[i].label, x+3, y+pH-3);
       }
       y+=pH+10;
 
