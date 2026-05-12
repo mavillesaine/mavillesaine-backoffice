@@ -504,24 +504,25 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
 <div class="footer">MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr</div>
 
-<div class="no-print" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;z-index:100;">
-  <button onclick="window.print()" style="background:#0f172a;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:8px;">
-    🖨️ Imprimer / PDF
-  </button>
-  <button onclick="window.location.href='mailto:${tech ? tech.email || '' : ''}?subject=Bon%20d%27intervention%20${sig.ref||''}&body=' + encodeURIComponent(document.title)" style="background:#2563eb;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
-    📧 Email
-  </button>
-  <button onclick="window.location.href='sms:${tech ? (tech.telephone||'').replace(/\s/g,'').replace(/^0/,'+33') : ''}?body=' + encodeURIComponent('🔧 BON INTERVENTION ${sig.ref||\'\'}\n📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine')" style="background:#16a34a;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
-    💬 SMS
-  </button>
-  <button onclick="window.open('https://wa.me/${tech ? (tech.telephone||'').replace(/\s/g,'').replace(/^0/,'+33') : ''}?text=' + encodeURIComponent('🔧 BON INTERVENTION ${sig.ref||\'\'}\n📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine'))" style="background:#25D366;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
-    🟢 WhatsApp
-  </button>
-  <button onclick="navigator.clipboard.writeText('🔧 BON INTERVENTION ${sig.ref||\'\'}
-📍 ${sig.adresse||\'\'}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)||\'\'}\n👷 ' + '${tech ? tech.nom : \'Non assigné\'}' + '\n🌐 MaVilleSaine').then(()=>alert('Copié !'))" style="background:#64748b;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">
-    📋 Copier
-  </button>
+<div class="no-print" id="actions-bar" style="position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #e2e8f0;padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,0.1);">
+  <button id="btn-print" style="background:#0f172a;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">🖨️ PDF</button>
+  <button id="btn-email" style="background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">📧 Email</button>
+  <button id="btn-sms" style="background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">💬 SMS</button>
+  <button id="btn-whatsapp" style="background:#25D366;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">WhatsApp</button>
+  <button id="btn-copy" style="background:#64748b;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">📋 Copier</button>
 </div>
+<div style="height:70px"></div>
+<script>
+  var ref      = document.title.replace("Bon d'intervention ","");
+  var adresse  = document.querySelector(".section-value") ? document.querySelector(".section-value").textContent : "";
+  var msg      = "Bon d'intervention " + ref + "\nAdresse : " + adresse + "\nMaVilleSaine";
+
+  document.getElementById("btn-print").onclick    = function(){ window.print(); };
+  document.getElementById("btn-email").onclick    = function(){ window.location.href = "mailto:?subject=" + encodeURIComponent("Bon d'intervention " + ref) + "&body=" + encodeURIComponent(msg); };
+  document.getElementById("btn-sms").onclick      = function(){ window.location.href = "sms:?body=" + encodeURIComponent(msg); };
+  document.getElementById("btn-whatsapp").onclick = function(){ window.open("https://wa.me/?text=" + encodeURIComponent(msg)); };
+  document.getElementById("btn-copy").onclick     = function(){ navigator.clipboard.writeText(msg).then(function(){ alert("Copie dans le presse-papiers !"); }); };
+<\/script>
 
 </body>
 </html>`;
