@@ -512,17 +512,17 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   <button id="btn-copy" style="background:#64748b;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">📋 Copier</button>
 </div>
 <div style="height:70px"></div>
-<script>
-  var ref      = document.title.replace("Bon d'intervention ","");
+<script type="text/javascript">
+  var ref      = document.title.replace("Bon intervention ","");
   var adresse  = document.querySelector(".section-value") ? document.querySelector(".section-value").textContent : "";
-  var msg      = "Bon d'intervention " + ref + "\nAdresse : " + adresse + "\nMaVilleSaine";
+  var msg      = "Bon intervention " + ref + " - Adresse : " + adresse + " - MaVilleSaine";
 
   document.getElementById("btn-print").onclick    = function(){ window.print(); };
-  document.getElementById("btn-email").onclick    = function(){ window.location.href = "mailto:?subject=" + encodeURIComponent("Bon d'intervention " + ref) + "&body=" + encodeURIComponent(msg); };
+  document.getElementById("btn-email").onclick    = function(){ window.location.href = "mailto:?subject=Bon+intervention+" + ref + "&body=" + encodeURIComponent(msg); };
   document.getElementById("btn-sms").onclick      = function(){ window.location.href = "sms:?body=" + encodeURIComponent(msg); };
   document.getElementById("btn-whatsapp").onclick = function(){ window.open("https://wa.me/?text=" + encodeURIComponent(msg)); };
-  document.getElementById("btn-copy").onclick     = function(){ navigator.clipboard.writeText(msg).then(function(){ alert("Copie dans le presse-papiers !"); }); };
-<\/script>
+  document.getElementById("btn-copy").onclick     = function(){ navigator.clipboard.writeText(msg).then(function(){ alert("Copie !"); }); };
+${"<"}/script>
 
 </body>
 </html>`;
