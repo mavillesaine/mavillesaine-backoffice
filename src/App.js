@@ -464,13 +464,13 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   <div class="photos">
     <div class="photo-box">
       ${sig.photo_detail_url
-        ? `<img src="${sig.photo_detail_url}" alt="Photo détail" crossorigin="anonymous"/>`
+        ? `<img src="${sig.photo_detail_url}" alt="Photo détail"/>`
         : `<div class="photo-placeholder">📷 Photo non disponible</div>`}
       <div class="photo-label">Photo détail</div>
     </div>
     <div class="photo-box">
       ${sig.photo_large_url
-        ? `<img src="${sig.photo_large_url}" alt="Vue large" crossorigin="anonymous"/>`
+        ? `<img src="${sig.photo_large_url}" alt="Vue large"/>`
         : `<div class="photo-placeholder">📷 Photo non disponible</div>`}
       <div class="photo-label">Vue d'ensemble</div>
     </div>
