@@ -366,125 +366,156 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const genererPDF = async () => {
     setLoadingPDF(true);
     try {
-      if (!window.jspdf) {
-        await new Promise((res,rej) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-          s.onload=res; s.onerror=rej; document.head.appendChild(s);
-        });
-      }
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
-      const W=210, M=15;
-
-      doc.setFillColor(10,22,40); doc.rect(0,0,W,38,"F");
-      doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont("helvetica","bold");
-      doc.text("MaVilleSaine",M,16);
-      doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(150,200,150);
-      doc.text("BON D'INTERVENTION TECHNIQUE",M,23);
-      doc.setTextColor(180,180,180);
-      doc.text(`Généré le ${new Date().toLocaleDateString("fr-FR")}`,M,29);
-      doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont("helvetica","bold");
-      doc.text(sig.ref||"",W-M,16,{align:"right"});
-
-      let y=48;
-      const urgColors={normal:[22,163,74],genant:[180,83,9],dangereux:[220,38,38]};
-      const [r,g,b]=urgColors[sig.urgence]||urgColors.normal;
-      doc.setFillColor(r,g,b); doc.roundedRect(M,y-5,60,10,2,2,"F");
-      doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont("helvetica","bold");
-      doc.text(`URGENCE : ${urg.label.toUpperCase()}`,M+4,y+1);
-      y+=14;
-
-      doc.setFillColor(248,250,252); doc.rect(M,y,W-M*2,30,"F");
-      doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,30,"S");
-      doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-      doc.text("LOCALISATION",M+4,y+6);
-      doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont("helvetica","bold");
-      doc.text(sig.adresse||"",M+4,y+14);
-      doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(100,116,139);
-      doc.text(`Catégorie : ${cat.label}   |   Date : ${sig.created_at?.slice(0,10)}   |   Votes : ${sig.votes||0}`,M+4,y+21);
-      if (sig.latitude) doc.text(`GPS : ${sig.latitude}, ${sig.longitude}`,M+4,y+27);
-      y+=36;
-
-      if (sig.description) {
-        doc.setFillColor(255,255,255); doc.rect(M,y,W-M*2,22,"F");
-        doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,22,"S");
-        doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-        doc.text("DESCRIPTION",M+4,y+6);
-        doc.setTextColor(51,65,85); doc.setFontSize(9); doc.setFont("helvetica","normal");
-        doc.text(doc.splitTextToSize(sig.description,W-M*2-8).slice(0,2),M+4,y+13);
-        y+=28;
-      }
-
-      doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-      doc.text("PHOTOS",M,y+5); y+=10;
-      const pW=(W-M*2-6)/2, pH=65;
-
-      // Convertir une URL image en base64 via canvas (contourne CORS)
-      const toBase64 = (url) => new Promise((resolve) => {
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width  = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext("2d").drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/jpeg", 0.85));
-        };
-        img.onerror = () => resolve(null);
-        img.src = url + "?t=" + Date.now(); // cache-buster
-      });
-
-      const photos = [
-        { url: sig.photo_detail_url, label: "Photo détail" },
-        { url: sig.photo_large_url,  label: "Vue d'ensemble" },
-      ];
-
-      for (let i = 0; i < 2; i++) {
-        const x = M + i * (pW + 6);
-        doc.setFillColor(241,245,249); doc.rect(x,y,pW,pH,"F");
-        doc.setDrawColor(226,232,240); doc.rect(x,y,pW,pH,"S");
-
-        if (photos[i].url) {
-          const b64 = await toBase64(photos[i].url);
-          if (b64) {
-            try {
-              doc.addImage(b64, "JPEG", x+1, y+1, pW-2, pH-10);
-            } catch { /* image non supportée */ }
-          }
-        } else {
-          doc.setTextColor(148,163,184); doc.setFontSize(8);
-          doc.text("Photo non disponible", x+pW/2, y+pH/2, {align:"center"});
-        }
-
-        doc.setFillColor(0,0,0); doc.rect(x, y+pH-9, pW, 9, "F");
-        doc.setTextColor(255,255,255); doc.setFontSize(7);
-        doc.text(photos[i].label, x+3, y+pH-3);
-      }
-      y+=pH+10;
-
       const tech = selectedTech || techniciens.find(t=>t.id===sig.technicien_id);
-      if (tech) {
-        doc.setFillColor(232,245,238); doc.rect(M,y,W-M*2,30,"F");
-        doc.setDrawColor(134,239,172); doc.rect(M,y,W-M*2,30,"S");
-        doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
-        doc.text("TECHNICIEN ASSIGNÉ",M+4,y+6);
-        doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont("helvetica","bold");
-        doc.text(tech.nom,M+4,y+14);
-        doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(51,65,85);
-        if (tech.specialite) doc.text(`Spécialité : ${tech.specialite}`,M+4,y+20);
-        doc.text([tech.telephone,tech.email].filter(Boolean).join("   |   "),M+4,y+26);
-        y+=36;
-      }
+      const urgColors = { normal:"#16a34a", genant:"#b45309", dangereux:"#dc2626" };
+      const urgColor  = urgColors[sig.urgence] || urgColors.normal;
 
-      doc.setFillColor(10,22,40); doc.rect(0,282,W,15,"F");
-      doc.setTextColor(100,100,100); doc.setFontSize(7);
-      doc.text("MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr",W/2,291,{align:"center"});
-      doc.save(`bon-intervention-${sig.ref||"mvs"}.pdf`);
+      const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<title>Bon d'intervention ${sig.ref||""}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Outfit',sans-serif; background:#fff; color:#0f172a; font-size:13px; }
+  @media print {
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .no-print { display:none !important; }
+    @page { margin:10mm; size:A4; }
+  }
+
+  .header { background:#0f172a; color:#fff; padding:20px 24px; display:flex; justify-content:space-between; align-items:flex-start; border-radius:0 0 0 0; }
+  .header-left h1 { font-size:22px; font-weight:900; color:#fff; }
+  .header-left p  { font-size:11px; color:#86efac; margin-top:3px; }
+  .header-left small { font-size:10px; color:#94a3b8; }
+  .header-right { text-align:right; }
+  .ref { font-size:18px; font-weight:900; color:#fff; }
+  .date { font-size:10px; color:#94a3b8; margin-top:4px; }
+
+  .body { padding:20px 24px; }
+
+  .urgence-badge { display:inline-block; background:${urgColor}; color:#fff; font-size:11px; font-weight:700; padding:5px 14px; border-radius:20px; margin-bottom:16px; letter-spacing:0.5px; }
+
+  .section { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .section-title { font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+  .section-value { font-size:14px; font-weight:700; color:#0f172a; }
+  .section-meta  { font-size:11px; color:#64748b; margin-top:4px; }
+
+  .photos { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+  .photo-box { border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; position:relative; }
+  .photo-box img { width:100%; height:180px; object-fit:cover; display:block; }
+  .photo-label { background:rgba(0,0,0,0.6); color:#fff; font-size:11px; font-weight:600; padding:6px 10px; }
+  .photo-placeholder { height:180px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:12px; }
+
+  .tech-box { background:#e8f5ee; border:1px solid #86efac; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .tech-name { font-size:16px; font-weight:800; color:#0f172a; margin-bottom:4px; }
+  .tech-meta  { font-size:12px; color:#64748b; }
+
+  .actions { border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .action-item { font-size:12px; color:#334155; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .checkbox { width:14px; height:14px; border:2px solid #94a3b8; border-radius:3px; display:inline-block; flex-shrink:0; }
+
+  .signatures { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:14px; }
+  .sig-box { border:1px solid #e2e8f0; border-radius:8px; padding:12px; }
+  .sig-title { font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:24px; }
+  .sig-line  { border-top:1px solid #cbd5e1; margin-top:8px; }
+
+  .footer { background:#0f172a; color:#64748b; font-size:10px; text-align:center; padding:10px; border-radius:0; }
+
+  .print-btn { position:fixed; bottom:24px; right:24px; background:#1a6b3c; color:#fff; border:none; padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Outfit',sans-serif; box-shadow:0 4px 16px rgba(26,107,60,0.4); }
+  .print-btn:hover { background:#155c33; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>🏙️ MaVilleSaine</h1>
+    <p>BON D'INTERVENTION TECHNIQUE</p>
+    <small>Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</small>
+  </div>
+  <div class="header-right">
+    <div class="ref">${sig.ref||""}</div>
+    <div class="date">Signalement du ${sig.created_at?.slice(0,10)||""}</div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="urgence-badge">⚡ URGENCE : ${urg.label.toUpperCase()}</div>
+
+  <div class="section">
+    <div class="section-title">📍 Localisation</div>
+    <div class="section-value">${sig.adresse||"Coordonnées GPS"}</div>
+    <div class="section-meta">
+      Catégorie : ${cat.label} &nbsp;·&nbsp; Date : ${sig.created_at?.slice(0,10)||""} &nbsp;·&nbsp; Confirmations : ${sig.votes||0}
+      ${sig.latitude ? `<br/>GPS : ${sig.latitude}, ${sig.longitude}` : ""}
+    </div>
+  </div>
+
+  ${sig.description ? `
+  <div class="section">
+    <div class="section-title">💬 Description</div>
+    <div class="section-meta" style="font-size:13px;color:#334155;">${sig.description}</div>
+  </div>` : ""}
+
+  <div class="section-title" style="margin-bottom:8px;">📸 Photos</div>
+  <div class="photos">
+    <div class="photo-box">
+      ${sig.photo_detail_url
+        ? `<img src="${sig.photo_detail_url}" alt="Photo détail" crossorigin="anonymous"/>`
+        : `<div class="photo-placeholder">📷 Photo non disponible</div>`}
+      <div class="photo-label">Photo détail</div>
+    </div>
+    <div class="photo-box">
+      ${sig.photo_large_url
+        ? `<img src="${sig.photo_large_url}" alt="Vue large" crossorigin="anonymous"/>`
+        : `<div class="photo-placeholder">📷 Photo non disponible</div>`}
+      <div class="photo-label">Vue d'ensemble</div>
+    </div>
+  </div>
+
+  ${tech ? `
+  <div class="tech-box">
+    <div class="section-title">👷 Technicien assigné</div>
+    <div class="tech-name">${tech.nom}</div>
+    <div class="tech-meta">
+      ${tech.specialite ? `${tech.specialite} &nbsp;·&nbsp; ` : ""}
+      ${[tech.telephone, tech.email].filter(Boolean).join(" · ")}
+    </div>
+  </div>` : ""}
+
+  <div class="actions">
+    <div class="section-title">✅ Actions à réaliser</div>
+    ${["Vérifier et sécuriser le site","Réaliser les travaux nécessaires","Documenter l'intervention","Mettre à jour le statut dans MaVilleSaine"]
+      .map(a=>`<div class="action-item"><span class="checkbox"></span>${a}</div>`).join("")}
+  </div>
+
+  <div class="signatures">
+    ${["Superviseur","Technicien","Date d'intervention"].map(l=>`
+    <div class="sig-box">
+      <div class="sig-title">${l}</div>
+      <div class="sig-line"></div>
+    </div>`).join("")}
+  </div>
+
+</div>
+
+<div class="footer">MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr</div>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer PDF</button>
+
+</body>
+</html>`;
+
+      const w = window.open("", "_blank");
+      w.document.write(html);
+      w.document.close();
       setShowEnvoi(true);
-      toast.success("PDF généré !");
+      toast.success("Bon d'intervention généré !");
     } catch(err) {
-      toast.error("Erreur PDF : " + err.message);
+      toast.error("Erreur : " + err.message);
     } finally { setLoadingPDF(false); }
   };
 
