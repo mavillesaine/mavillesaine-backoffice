@@ -1,22 +1,15 @@
 // ============================================================
 // MAVILLESAINE — Back-office Superviseur (React Web)
 // ============================================================
-// INSTALLATION :
-//   npx create-react-app backoffice
-//   cd backoffice
-//   npm install axios react-router-dom @tanstack/react-query
-//              jspdf react-hot-toast lucide-react
-//
-// Remplacez API_URL par l'URL de votre backend
-// ============================================================
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import toast, { Toaster } from "react-hot-toast";
 
 const API_URL = "https://mavillesaine-backend.onrender.com/api";
+const SUPABASE_URL  = "https://yemtwkylcankpopwrpav.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllbXR3a3lsY2Fua3BvcHdycGF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTY3NDEsImV4cCI6MjA5MzgzMjc0MX0.yHopBYugcAjOxdt7HeMcRlK7xnrW5rur0_7A9sWeJ_E";
 
-// ── Helpers ───────────────────────────────────────────────────
 const api = axios.create({ baseURL: API_URL });
 api.interceptors.request.use(cfg => {
   const token = localStorage.getItem("mvp_token");
@@ -51,8 +44,6 @@ const G = {
   g400:"#94a3b8", g500:"#64748b", g700:"#334155", g900:"#0f172a",
 };
 
-// ── Composants UI ─────────────────────────────────────────────
-
 function Badge({ statut }) {
   const s = STATUTS[statut] || STATUTS.recu;
   return (
@@ -85,7 +76,25 @@ function CatIcon({ id, size=36 }) {
   );
 }
 
-// ── Écran LOGIN ───────────────────────────────────────────────
+// ── Helper : upload PDF sur Supabase Storage ─────────────────
+async function uploadPdfToSupabase(pdfBlob, fileName) {
+  const url = `${SUPABASE_URL}/storage/v1/object/bons-intervention/${fileName}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${SUPABASE_ANON}`,
+      "apikey":        SUPABASE_ANON,
+      "Content-Type":  "application/pdf",
+      "x-upsert":      "true",
+    },
+    body: pdfBlob,
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Upload failed: ${response.status} - ${errText}`);
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/bons-intervention/${fileName}`;
+}
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail]       = useState("");
@@ -157,8 +166,6 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ── Modal TECHNICIENS ─────────────────────────────────────────
-
 function ModalTechniciens({ techniciens, onSave, onClose }) {
   const [liste, setListe]   = useState([...techniciens]);
   const [form, setForm]     = useState({ nom:"", specialite:"", telephone:"", email:"", couleur:"#2563eb" });
@@ -205,7 +212,6 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
           <div onClick={onClose} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:20 }}>✕</div>
         </div>
         <div style={{ padding:22 }}>
-          {/* Formulaire */}
           <div style={{ background:G.g50, borderRadius:14, padding:18, marginBottom:20, border:`1px solid ${G.g200}` }}>
             <div style={{ fontSize:14, fontWeight:700, color:G.g900, marginBottom:14 }}>
               {editId ? "✏️ Modifier" : "➕ Ajouter un technicien"}
@@ -257,7 +263,6 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Liste */}
           <div style={{ fontSize:14, fontWeight:700, color:G.g900, marginBottom:12 }}>
             Techniciens ({liste.length})
           </div>
@@ -300,8 +305,6 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
   );
 }
 
-// ── Panneau DÉTAIL ────────────────────────────────────────────
-
 function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const [telLibre, setTelLibre]     = useState("");
   const [modeEnvoi, setModeEnvoi]   = useState("tech");
@@ -309,6 +312,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const [showEnvoi, setShowEnvoi]   = useState(false);
   const [loadingStatut, setLoadingStatut] = useState(false);
   const [loadingPDF, setLoadingPDF] = useState(false);
+  const [pdfUrl, setPdfUrl]         = useState("");
 
   const cat = CATEGORIES.find(c=>c.id===sig.categorie) || CATEGORIES[5];
   const urg = URGENCES[sig.urgence] || URGENCES.normal;
@@ -338,7 +342,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const genererEtEnvoyer = async () => {
     setLoadingPDF(true);
     try {
-      // Charger jsPDF
       if (!window.jspdf) {
         await new Promise((res,rej) => {
           const s = document.createElement("script");
@@ -346,7 +349,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
           s.onload=res; s.onerror=rej; document.head.appendChild(s);
         });
       }
-      // Charger EmailJS
       if (!window.emailjs) {
         await new Promise((res,rej) => {
           const s = document.createElement("script");
@@ -398,7 +400,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         y+=28;
       }
 
-      // Photos placeholder
       doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
       doc.text("PHOTOS",M,y+5); y+=10;
       const pW=(W-M*2-6)/2, pH=55;
@@ -406,17 +407,20 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         const photoUrl = i===0 ? sig.photo_detail_url : sig.photo_large_url;
         doc.setFillColor(241,245,249); doc.rect(M+i*(pW+6),y,pW,pH,"F");
         doc.setDrawColor(226,232,240); doc.rect(M+i*(pW+6),y,pW,pH,"S");
+        // Si on a une photo base64, on l'intègre directement dans le PDF
+        if (photoUrl && photoUrl.startsWith("data:image")) {
+          try {
+            doc.addImage(photoUrl, "JPEG", M+i*(pW+6)+2, y+2, pW-4, pH-10);
+          } catch (e) {
+            console.error("[PDF photo]", e);
+          }
+        }
         doc.setFillColor(0,0,0); doc.rect(M+i*(pW+6),y+pH-8,pW,8,"F");
         doc.setTextColor(255,255,255); doc.setFontSize(7);
         doc.text(i===0?"Photo détail":"Vue d'ensemble",M+i*(pW+6)+3,y+pH-3);
-        if (!photoUrl) {
-          doc.setTextColor(148,163,184); doc.setFontSize(8);
-          doc.text(i===0?"Photo détail":"Vue large",M+i*(pW+6)+pW/2,y+pH/2,{align:"center"});
-        }
       }
       y+=pH+10;
 
-      // Technicien assigné
       const tech = selectedTech || techniciens.find(t=>t.id===sig.technicien_id);
       if (tech) {
         doc.setFillColor(232,245,238); doc.rect(M,y,W-M*2,30,"F");
@@ -436,7 +440,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         y+=26;
       }
 
-      // Actions
       doc.setFillColor(255,255,255); doc.rect(M,y,W-M*2,34,"F");
       doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,34,"S");
       doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
@@ -448,7 +451,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       });
       y+=40;
 
-      // Signatures
       doc.setFillColor(248,250,252); doc.rect(M,y,W-M*2,28,"F");
       doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,28,"S");
       const cW=(W-M*2)/3;
@@ -466,13 +468,24 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       // Télécharger le PDF localement
       doc.save(`bon-intervention-${sig.ref}.pdf`);
 
-      // Récupérer superviseur connecté
+      // Upload PDF sur Supabase Storage pour avoir un lien partageable
+      let pdfPublicUrl = "";
+      try {
+        const pdfBlob = doc.output("blob");
+        const fileName = `${sig.ref}-${Date.now()}.pdf`;
+        pdfPublicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
+        setPdfUrl(pdfPublicUrl);
+        console.log("[PDF URL]", pdfPublicUrl);
+      } catch (err) {
+        console.error("[UPLOAD PDF]", err);
+        toast.error("PDF généré mais upload Supabase échoué : " + err.message);
+      }
+
       const userLocal = JSON.parse(localStorage.getItem("mvp_user") || "{}");
       const techLocal = selectedTech || techniciens.find(t=>t.id===sig.technicien_id);
 
-      // Envoyer par email si technicien avec email
+      // Envoyer par email avec le lien PDF
       if (techLocal?.email) {
-        // eslint-disable-next-line no-unused-vars
         await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           tech_nom:          techLocal.nom,
           tech_email:        techLocal.email,
@@ -483,6 +496,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
           description:       sig.description || "Aucune description",
           superviseur_nom:   userLocal.nom  || "Superviseur MaVilleSaine",
           superviseur_email: userLocal.email || "",
+          pdf_url:           pdfPublicUrl || "Lien PDF indisponible",
         });
         toast.success(`✅ Email envoyé à ${techLocal.nom} (${techLocal.email})`);
       } else {
@@ -498,7 +512,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   };
 
   const destinataire = modeEnvoi==="tech" ? selectedTech : (telLibre ? { nom:null, tel:telLibre } : null);
-  const msgTexte = `🔧 BON D'INTERVENTION ${sig.ref}\n📍 ${sig.adresse}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)}\n👷 ${destinataire?.nom||telLibre||"Non assigné"}\n📝 ${sig.description||"Aucune description"}\n🌐 MaVilleSaine`;
+  const msgTexte = `🔧 BON D'INTERVENTION ${sig.ref}\n📍 ${sig.adresse}\n🏷️ ${cat.label} — ${urg.label}\n📅 ${sig.created_at?.slice(0,10)}\n👷 ${destinataire?.nom||telLibre||"Non assigné"}\n📝 ${sig.description||"Aucune description"}${pdfUrl ? "\n📄 PDF : " + pdfUrl : ""}\n🌐 MaVilleSaine`;
   const tel = (destinataire?.telephone||destinataire?.tel||"").replace(/\s/g,"").replace(/^0/,"+33");
 
   return (
@@ -509,7 +523,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         animation:"slideIn 0.22s ease-out", fontFamily:"'Outfit',system-ui,sans-serif" }}>
         <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
 
-        {/* Header */}
         <div style={{ background:G.g900, padding:"18px 24px", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
           <div style={{ width:46, height:46, background:cat.color+"22", borderRadius:12,
             display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>{cat.icon}</div>
@@ -526,10 +539,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
           <div onClick={onClose} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:22, padding:"0 4px", flexShrink:0 }}>✕</div>
         </div>
 
-        {/* Corps */}
         <div style={{ flex:1, overflowY:"auto", padding:24 }}>
-
-          {/* Photos */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>Photos</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
@@ -548,7 +558,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* Infos */}
           <div style={{ background:G.g50, borderRadius:14, padding:18, marginBottom:22, border:`1px solid ${G.g200}` }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:14 }}>Informations</div>
             {[
@@ -567,7 +576,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             ))}
           </div>
 
-          {/* Description */}
           {sig.description && (
             <div style={{ marginBottom:22 }}>
               <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Description</div>
@@ -577,7 +585,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* Urgence */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8, display:"flex", alignItems:"center", gap:8 }}>
               Urgence
@@ -595,7 +602,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* Statut */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Statut</div>
             <div style={{ display:"flex", gap:10 }}>
@@ -610,12 +616,10 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* Assigner technicien */}
           <div style={{ marginBottom:22 }}>
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>
               Assigner / Envoyer à
             </div>
-            {/* Tabs */}
             <div style={{ display:"flex", background:G.g100, borderRadius:10, padding:"3px", marginBottom:14 }}>
               {[["tech","👷 Technicien enregistré"],["libre","📱 Numéro libre"]].map(([id,label])=>(
                 <div key={id} onClick={()=>setModeEnvoi(id)}
@@ -674,7 +678,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
           </div>
         </div>
 
-        {/* Footer */}
         <div style={{ padding:"16px 24px", borderTop:`1px solid ${G.g200}`, background:"#fff", flexShrink:0 }}>
           <button onClick={genererEtEnvoyer} disabled={loadingPDF}
             style={{ width:"100%", padding:16, borderRadius:14, border:"none",
@@ -687,7 +690,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       </div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Modal canaux envoi */}
       {showEnvoi && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000,
           display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
@@ -699,9 +701,15 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             <div style={{ padding:22 }}>
               <div style={{ background:G.vertClair, borderRadius:12, padding:14, border:"1px solid #86efac", marginBottom:18, display:"flex", alignItems:"center", gap:12 }}>
                 <span style={{ fontSize:24 }}>✅</span>
-                <div>
+                <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:700, color:G.vert }}>PDF généré</div>
-                  <div style={{ fontSize:11, color:G.g500 }}>bon-intervention-{sig.ref}.pdf — téléchargé</div>
+                  <div style={{ fontSize:11, color:G.g500 }}>bon-intervention-{sig.ref}.pdf</div>
+                  {pdfUrl && (
+                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize:11, color:G.vert, textDecoration:"underline", wordBreak:"break-all" }}>
+                      📄 Lien public du PDF
+                    </a>
+                  )}
                 </div>
               </div>
               <div style={{ fontSize:13, fontWeight:700, color:G.g700, marginBottom:12 }}>Envoyer via :</div>
@@ -726,7 +734,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                 ))}
               </div>
               <div style={{ fontSize:11, color:G.g400, marginTop:12, textAlign:"center", lineHeight:1.5 }}>
-                SMS et WhatsApp ouvrent votre app native avec le message pré-rempli.
+                Le lien du PDF est inclus dans tous les canaux ci-dessus.
               </div>
             </div>
           </div>
@@ -735,8 +743,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
     </>
   );
 }
-
-// ── APPLICATION BACK-OFFICE ───────────────────────────────────
 
 export default function BackOffice() {
   const [user, setUser]                   = useState(() => {
@@ -762,7 +768,6 @@ export default function BackOffice() {
         api.get("/techniciens"),
         api.get("/stats"),
       ]);
-      // FIX: le backend retourne un tableau direct, pas { signalements: [...] }
       setSignalements(Array.isArray(sigRes.data) ? sigRes.data : (sigRes.data.signalements || []));
       setTechniciens(techRes.data || []);
       setStats(statsRes.data);
@@ -802,7 +807,6 @@ export default function BackOffice() {
       fontFamily:"'Outfit','DM Sans',system-ui,sans-serif", background:G.g50, overflow:"hidden" }}>
       <Toaster position="top-right" />
 
-      {/* Header */}
       <div style={{ background:G.g900, height:56, padding:"0 24px", display:"flex",
         alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -832,7 +836,6 @@ export default function BackOffice() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ background:"#fff", padding:"10px 20px", display:"flex", gap:10,
         borderBottom:`1px solid ${G.g200}`, flexShrink:0, overflowX:"auto", alignItems:"center" }}>
         {[
@@ -864,7 +867,6 @@ export default function BackOffice() {
         </div>
       </div>
 
-      {/* Contenu */}
       <div style={{ flex:1, overflow:"hidden", minHeight:0, overflowY:"auto" }}>
         {loading && signalements.length===0 ? (
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", gap:12 }}>
@@ -929,7 +931,6 @@ export default function BackOffice() {
         )}
       </div>
 
-      {/* Panneau détail */}
       {selectedSig && (
         <PanneauDetail
           sig={selectedSig}
@@ -939,7 +940,6 @@ export default function BackOffice() {
         />
       )}
 
-      {/* Modal techniciens */}
       {showTech && (
         <ModalTechniciens
           techniciens={techniciens}
