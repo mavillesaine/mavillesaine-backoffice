@@ -478,9 +478,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         toast.error("PDF généré mais upload Supabase échoué : " + err.message);
       }
 
-      const userLocal = JSON.parse(localStorage.getItem("mvp_user") || "{}");
-      const techLocal = selectedTech || techniciens.find(t=>t.id===sig.technicien_id);
-
       toast.success("PDF généré ! Choisissez un canal d'envoi.");
       setShowEnvoi(true);
     } catch(err) {
