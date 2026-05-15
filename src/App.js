@@ -444,8 +444,8 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.setDrawColor(226,232,240); doc.rect(M,y,W-M*2,34,"S");
       doc.setTextColor(100,116,139); doc.setFontSize(7); doc.setFont("helvetica","bold");
       doc.text("ACTIONS À RÉALISER",M+4,y+6);
-      ["☐  Vérifier et sécuriser le site","☐  Réaliser les travaux nécessaires",
-       "☐  Documenter l'intervention","☐  Mettre à jour le statut dans MaVilleSaine"].forEach((l,i)=>{
+      ["[ ]  Verifier et securiser le site","[ ]  Realiser les travaux necessaires",
+       "[ ]  Documenter l'intervention","[ ]  Mettre a jour le statut dans MaVilleSaine"].forEach((l,i)=>{
         doc.setTextColor(51,65,85); doc.setFontSize(8); doc.setFont("helvetica","normal");
         doc.text(l,M+4,y+13+i*5);
       });
@@ -465,9 +465,6 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.setTextColor(100,100,100); doc.setFontSize(7);
       doc.text("MaVilleSaine © 2026 · Document confidentiel · mavillesaine.fr",W/2,291,{align:"center"});
 
-      // Télécharger le PDF localement
-      doc.save(`bon-intervention-${sig.ref}.pdf`);
-
       // Upload PDF sur Supabase Storage pour avoir un lien partageable
       let pdfPublicUrl = "";
       try {
@@ -484,26 +481,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       const userLocal = JSON.parse(localStorage.getItem("mvp_user") || "{}");
       const techLocal = selectedTech || techniciens.find(t=>t.id===sig.technicien_id);
 
-      // Envoyer par email avec le lien PDF
-      if (techLocal?.email) {
-        await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-          tech_nom:          techLocal.nom,
-          tech_email:        techLocal.email,
-          ref:               sig.ref,
-          categorie:         cat.label,
-          adresse:           sig.adresse || "",
-          urgence:           urg.label,
-          description:       sig.description || "Aucune description",
-          superviseur_nom:   userLocal.nom  || "Superviseur MaVilleSaine",
-          superviseur_email: userLocal.email || "",
-          pdf_url:           pdfPublicUrl || "Lien PDF indisponible",
-        });
-        toast.success(`✅ Email envoyé à ${techLocal.nom} (${techLocal.email})`);
-      } else {
-        toast.success("PDF généré et téléchargé !");
-        if (techLocal && !techLocal.email) toast("⚠️ Aucun email pour ce technicien", { icon:"⚠️" });
-      }
-
+      toast.success("PDF généré ! Choisissez un canal d'envoi.");
       setShowEnvoi(true);
     } catch(err) {
       console.error(err);
@@ -715,7 +693,27 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
               <div style={{ fontSize:13, fontWeight:700, color:G.g700, marginBottom:12 }}>Envoyer via :</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                 {[
-                  {label:"Email",     icon:"📧", color:"#2563eb", action:()=>window.open(`mailto:${destinataire?.email||""}?subject=Bon d'intervention ${sig.ref}&body=${encodeURIComponent(msgTexte)}`)},
+                  {label:"Email",     icon:"📧", color:"#2563eb", action:async()=>{
+                    if (!destinataire?.email) { toast.error("Pas d'email pour ce destinataire"); return; }
+                    try {
+                      const userLocal = JSON.parse(localStorage.getItem("mvp_user") || "{}");
+                      await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+                        tech_nom:          destinataire.nom || "",
+                        tech_email:        destinataire.email,
+                        ref:               sig.ref,
+                        categorie:         cat.label,
+                        adresse:           sig.adresse || "",
+                        urgence:           urg.label,
+                        description:       sig.description || "Aucune description",
+                        superviseur_nom:   userLocal.nom  || "Superviseur MaVilleSaine",
+                        superviseur_email: userLocal.email || "",
+                        pdf_url:           pdfUrl || "Lien PDF indisponible",
+                      });
+                      toast.success(`Email envoyé à ${destinataire.email}`);
+                    } catch (err) {
+                      toast.error("Erreur envoi email : " + err.message);
+                    }
+                  }},
                   {label:"SMS",       icon:"💬", color:"#16a34a", action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
                   {label:"WhatsApp",  icon:"🟢", color:"#25D366", action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
                   {label:"Telegram",  icon:"✈️", color:"#2AABEE", action:()=>window.open(`https://t.me/share/url?url=mavillesaine.fr&text=${encodeURIComponent(msgTexte)}`)},
