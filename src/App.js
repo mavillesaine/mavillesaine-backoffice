@@ -989,7 +989,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
               <div style={{ fontSize:13, fontWeight:700, color:G.g700, marginBottom:12 }}>Envoyer via :</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                 {[
-                  {label:"Email",     icon:"📧", color:"#2563eb", action:async()=>{
+                  {label:"Email",     icon:"📧", color:"#2563eb", mobileOnly:false, action:async()=>{
                     if (!destinataire?.email) { toast.error("Pas d'email pour ce destinataire"); return; }
                     try {
                       const userLocal = JSON.parse(localStorage.getItem("mvp_user") || "{}");
@@ -1010,12 +1010,11 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                       toast.error("Erreur envoi email : " + err.message);
                     }
                   }},
-                  {label:"SMS",       icon:"💬", color:"#16a34a", action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
-                  {label:"WhatsApp",  icon:"🟢", color:"#25D366", action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Telegram",  icon:"✈️", color:"#2AABEE", action:()=>window.open(`https://t.me/share/url?url=mavillesaine.fr&text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Messenger", icon:"💙", color:"#0084FF", action:()=>window.open(`https://m.me/?text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Copier",    icon:"📋", color:"#64748b", action:()=>{navigator.clipboard?.writeText(msgTexte);toast.success("Copié !");}},
-                ].map(c=>(
+                  {label:"SMS",       icon:"💬", color:"#16a34a", mobileOnly:true,  action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
+                  {label:"WhatsApp",  icon:"🟢", color:"#25D366", mobileOnly:true,  action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
+                  {label:"Messenger", icon:"💙", color:"#0084FF", mobileOnly:false, action:()=>window.open(`https://m.me/?text=${encodeURIComponent(msgTexte)}`)},
+                  {label:"Copier",    icon:"📋", color:"#64748b", mobileOnly:false, action:()=>{navigator.clipboard?.writeText(msgTexte);toast.success("Copié !");}},
+                ].filter(c => !c.mobileOnly || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)).map(c=>(
                   <div key={c.label} onClick={c.action}
                     style={{ background:"#fff", border:`2px solid ${G.g200}`, borderRadius:12, padding:"12px 14px",
                       display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"all 0.15s" }}
