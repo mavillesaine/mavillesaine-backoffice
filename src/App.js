@@ -1042,6 +1042,13 @@ export default function BackOffice() {
 
   useEffect(() => { charger(); }, [charger]);
 
+  // Auto-refresh toutes les 30 secondes pour voir les nouveaux votes en temps réel
+  useEffect(() => {
+    if (!user || user.role === "admin") return;
+    const interval = setInterval(() => { charger(); }, 30000);
+    return () => clearInterval(interval);
+  }, [user, charger]);
+
   const logout = () => {
     localStorage.removeItem("mvp_token");
     localStorage.removeItem("mvp_user");
