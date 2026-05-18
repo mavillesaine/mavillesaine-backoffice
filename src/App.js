@@ -459,7 +459,7 @@ function AdminPanel({ user, onLogout }) {
 // ============================================================
 // MODAL TECHNICIENS
 // ============================================================
-function ModalTechniciens({ techniciens, onSave, onClose }) {
+function ModalTechniciens({ techniciens, user, onSave, onClose }) {
   const [liste, setListe]   = useState([...techniciens]);
   const [form, setForm]     = useState({ nom:"", specialite:"", telephone:"", email:"", couleur:"#2563eb" });
   const [editId, setEditId] = useState(null);
@@ -470,28 +470,61 @@ function ModalTechniciens({ techniciens, onSave, onClose }) {
     if (!form.nom.trim()) return;
     setLoading(true);
     try {
+      const headers = {
+        apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`,
+        "Content-Type": "application/json", Prefer: "return=representation"
+      };
       if (editId) {
-        const { data } = await api.put(`/techniciens/${editId}`, form);
-        setListe(p => p.map(t => t.id===editId ? data : t));
+        // UPDATE via Supabase
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/techniciens?id=eq.${editId}`, {
+          method: "PATCH", headers,
+          body: JSON.stringify({
+            nom: form.nom.trim(),
+            specialite: form.specialite.trim() || null,
+            telephone: form.telephone.trim() || null,
+            email: form.email.trim() || null,
+            couleur: form.couleur,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const [updated] = await res.json();
+        setListe(p => p.map(t => t.id===editId ? updated : t));
         setEditId(null);
       } else {
-        const { data } = await api.post("/techniciens", form);
-        setListe(p => [...p, data]);
+        // INSERT via Supabase
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/techniciens`, {
+          method: "POST", headers,
+          body: JSON.stringify({
+            nom: form.nom.trim(),
+            specialite: form.specialite.trim() || null,
+            telephone: form.telephone.trim() || null,
+            email: form.email.trim() || null,
+            couleur: form.couleur,
+            commune_id: user?.commune_id || null,
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const [created] = await res.json();
+        setListe(p => [...p, created]);
       }
       setForm({ nom:"", specialite:"", telephone:"", email:"", couleur:"#2563eb" });
       toast.success(editId ? "Technicien modifié" : "Technicien ajouté");
     } catch (err) {
-      toast.error(err.response?.data?.error || "Erreur");
+      toast.error("Erreur : " + (err.message || "inconnue"));
     } finally { setLoading(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer ce technicien ?")) return;
     try {
-      await api.delete(`/techniciens/${id}`);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/techniciens?id=eq.${id}`, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
       setListe(p => p.filter(t => t.id!==id));
       toast.success("Technicien supprimé");
-    } catch { toast.error("Erreur lors de la suppression"); }
+    } catch (err) { toast.error("Erreur : " + (err.message || "inconnue")); }
   };
 
   return (
@@ -1216,6 +1249,7 @@ export default function BackOffice() {
       {showTech && (
         <ModalTechniciens
           techniciens={techniciens}
+          user={user}
           onSave={liste=>{ setTechniciens(liste); setShowTech(false); }}
           onClose={()=>setShowTech(false)}
         />
