@@ -635,8 +635,6 @@ function ModalTechniciens({ techniciens, user, onSave, onClose }) {
 // PANNEAU DETAIL SIGNALEMENT
 // ============================================================
 function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
-  const [telLibre, setTelLibre]     = useState("");
-  const [modeEnvoi, setModeEnvoi]   = useState("tech");
   const [selectedTech, setSelectedTech] = useState(null);
   const [showEnvoi, setShowEnvoi]   = useState(false);
   const [loadingStatut, setLoadingStatut] = useState(false);
@@ -779,8 +777,8 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
     } finally { setLoadingPDF(false); }
   };
 
-  const destinataire = modeEnvoi==="tech" ? selectedTech : { nom:"Destinataire", email:"", telephone:telLibre };
-  const tel = modeEnvoi==="tech" ? (selectedTech?.telephone||"").replace(/\s/g,"") : telLibre.replace(/\s/g,"");
+  const destinataire = selectedTech;
+  const tel = (selectedTech?.telephone||"").replace(/\s/g,"");
   const msgTexte = `Bonjour,\n\nVoici votre bon d'intervention MaVilleSaine.\nRéf: ${sig.ref}\nAdresse: ${sig.adresse}\nUrgence: ${urg.label}\n\nLien PDF: ${pdfUrl}`;
 
   return (
@@ -894,61 +892,32 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
             <div style={{ fontSize:12, color:G.g500, fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>
               Assigner / Envoyer à
             </div>
-            <div style={{ display:"flex", background:G.g100, borderRadius:10, padding:"3px", marginBottom:14 }}>
-              {[["tech","👷 Technicien enregistré"],["libre","📱 Numéro libre"]].map(([id,label])=>(
-                <div key={id} onClick={()=>setModeEnvoi(id)}
-                  style={{ flex:1, padding:"8px", textAlign:"center", borderRadius:8, cursor:"pointer",
-                    background:modeEnvoi===id?"#fff":"transparent", color:modeEnvoi===id?G.g900:G.g500,
-                    fontSize:12, fontWeight:600, transition:"all 0.15s",
-                    boxShadow:modeEnvoi===id?"0 1px 4px rgba(0,0,0,0.1)":"none" }}>
-                  {label}
-                </div>
-              ))}
-            </div>
 
-            {modeEnvoi==="tech" && (
-              techniciens.length===0
-                ? <div style={{ background:"#fffbeb", borderRadius:12, padding:16, border:"1px solid #fcd34d", textAlign:"center", fontSize:13, color:"#92400e" }}>
-                    Aucun technicien — utilisez le bouton "Gérer les techniciens"
-                  </div>
-                : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {techniciens.map(t=>(
-                      <div key={t.id} onClick={()=>setSelectedTech(selectedTech?.id===t.id?null:t)}
-                        style={{ background:selectedTech?.id===t.id?G.vertClair:"#fff",
-                          border:`2px solid ${selectedTech?.id===t.id?G.vert:G.g200}`,
-                          borderRadius:12, padding:"13px 14px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", transition:"all 0.15s" }}>
-                        <div style={{ width:40, height:40, background:selectedTech?.id===t.id?G.vert:(t.couleur||"#64748b"),
-                          borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center",
-                          color:"#fff", fontSize:16, fontWeight:800, flexShrink:0 }}>
-                          {t.nom?.charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:14, fontWeight:700, color:G.g900 }}>{t.nom}</div>
-                          {t.specialite && <div style={{ fontSize:12, color:G.g500 }}>{t.specialite}</div>}
-                          <div style={{ fontSize:11, color:G.g400 }}>{[t.telephone,t.email].filter(Boolean).join(" · ")}</div>
-                        </div>
-                        {selectedTech?.id===t.id && <div style={{ color:G.vert, fontSize:20 }}>✓</div>}
+            {techniciens.length===0
+              ? <div style={{ background:"#fffbeb", borderRadius:12, padding:16, border:"1px solid #fcd34d", textAlign:"center", fontSize:13, color:"#92400e" }}>
+                  Aucun technicien — utilisez le bouton "Gérer les techniciens"
+                </div>
+              : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {techniciens.map(t=>(
+                    <div key={t.id} onClick={()=>setSelectedTech(selectedTech?.id===t.id?null:t)}
+                      style={{ background:selectedTech?.id===t.id?G.vertClair:"#fff",
+                        border:`2px solid ${selectedTech?.id===t.id?G.vert:G.g200}`,
+                        borderRadius:12, padding:"13px 14px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", transition:"all 0.15s" }}>
+                      <div style={{ width:40, height:40, background:selectedTech?.id===t.id?G.vert:(t.couleur||"#64748b"),
+                        borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center",
+                        color:"#fff", fontSize:16, fontWeight:800, flexShrink:0 }}>
+                        {t.nom?.charAt(0).toUpperCase()}
                       </div>
-                    ))}
-                  </div>
-            )}
-
-            {modeEnvoi==="libre" && (
-              <div style={{ background:"#fff", borderRadius:12, padding:16, border:`1px solid ${G.g200}` }}>
-                <div style={{ fontSize:13, fontWeight:600, color:G.g700, marginBottom:6 }}>Numéro de téléphone</div>
-                <div style={{ fontSize:12, color:G.g400, marginBottom:10, lineHeight:1.5 }}>
-                  Envoyez à n'importe quel numéro, même sans technicien enregistré.
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:G.g900 }}>{t.nom}</div>
+                        {t.specialite && <div style={{ fontSize:12, color:G.g500 }}>{t.specialite}</div>}
+                        <div style={{ fontSize:11, color:G.g400 }}>{[t.telephone,t.email].filter(Boolean).join(" · ")}</div>
+                      </div>
+                      {selectedTech?.id===t.id && <div style={{ color:G.vert, fontSize:20 }}>✓</div>}
+                    </div>
+                  ))}
                 </div>
-                <input type="tel" value={telLibre} onChange={e=>setTelLibre(e.target.value)}
-                  placeholder="06 00 00 00 00"
-                  style={{ width:"100%", padding:"12px 14px", borderRadius:10, border:`2px solid ${telLibre?G.vert:G.g200}`,
-                    fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
-                  onFocus={e=>e.target.style.borderColor=G.vert}
-                  onBlur={e=>e.target.style.borderColor=telLibre?G.vert:G.g200}
-                />
-                {telLibre && <div style={{ fontSize:12, color:G.vert, marginTop:8, fontWeight:600 }}>✓ Numéro prêt</div>}
-              </div>
-            )}
+            }
           </div>
         </div>
 
