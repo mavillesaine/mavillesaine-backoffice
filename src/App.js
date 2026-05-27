@@ -981,7 +981,10 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
                   }},
                   {label:"SMS",       icon:"💬", color:"#16a34a", mobileOnly:true,  action:()=>window.open(`sms:${tel}?body=${encodeURIComponent(msgTexte)}`)},
                   {label:"WhatsApp",  icon:"🟢", color:"#25D366", mobileOnly:true,  action:()=>window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgTexte)}`)},
-                  {label:"Messenger", icon:"💙", color:"#0084FF", mobileOnly:false, action:()=>window.open(`https://m.me/?text=${encodeURIComponent(msgTexte)}`)},
+                  {label:"WhatsApp Web", icon:"💻", color:"#128C7E", mobileOnly:false, action:()=>{
+                    if (!tel) { toast.error("Pas de téléphone pour ce destinataire"); return; }
+                    window.open(`https://web.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msgTexte)}`);
+                  }},
                   {label:"Copier",    icon:"📋", color:"#64748b", mobileOnly:false, action:()=>{navigator.clipboard?.writeText(msgTexte);toast.success("Copié !");}},
                 ].filter(c => !c.mobileOnly || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)).map(c=>(
                   <div key={c.label} onClick={c.action}
