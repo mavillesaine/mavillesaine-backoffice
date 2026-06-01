@@ -785,7 +785,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
     <>
       <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:200,
         backdropFilter:"blur(2px)" }} onClick={onClose}/>
-      <div style={{ position:"fixed", top:0, right:0, bottom:0, width:480, background:"#fff",
+      <div style={{ position:"fixed", top:0, right:0, bottom:0, width:"100%", maxWidth:480, background:"#fff",
         zIndex:300, overflowY:"auto", boxShadow:"-8px 0 40px rgba(0,0,0,0.2)", display:"flex", flexDirection:"column" }}>
         <div style={{ background:G.g900, padding:"18px 20px", display:"flex",
           alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
@@ -936,7 +936,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       {showEnvoi && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:1000,
           display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
-          <div style={{ background:"#fff", borderRadius:20, width:500, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 32px 80px rgba(0,0,0,0.4)" }}>
+          <div style={{ background:"#fff", borderRadius:20, width:"calc(100% - 24px)", maxWidth:500, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 32px 80px rgba(0,0,0,0.4)" }}>
             <div style={{ background:G.g900, borderRadius:"20px 20px 0 0", padding:"18px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ fontSize:16, fontWeight:800, color:"#fff" }}>📤 Envoyer le bon d'intervention</div>
               <div onClick={()=>setShowEnvoi(false)} style={{ color:"rgba(255,255,255,0.5)", cursor:"pointer", fontSize:20 }}>✕</div>
