@@ -668,6 +668,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
   const genererEtEnvoyer = async () => {
     setLoadingPDF(true);
+    toast("Étape 1: démarrage", { duration: 1500 });
     try {
       if (!window.jspdf) {
         await new Promise((res,rej) => {
@@ -767,13 +768,16 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.setTextColor(80,100,80);
       doc.text("www.mavillesaine.fr",W-M,288,{align:"right"});
 
+      toast("Étape 2: PDF prêt", { duration: 1500 });
       const pdfBlob = doc.output("blob");
       const fileName = `bon-intervention-${sig.ref}-${Date.now()}.pdf`;
       const publicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
+      toast.success("Étape 3: upload Supabase OK");
       setPdfUrl(publicUrl);
       setShowEnvoi(true);
     } catch(e) {
-      toast.error("Erreur génération PDF : " + e.message);
+          toast.error("ERREUR à l'étape : " + e.message, { duration: 8000 });
+      alert("Erreur attrapée : " + e.message + "\n\nStack: " + (e.stack || "n/a"));
     } finally { setLoadingPDF(false); }
   };
 
