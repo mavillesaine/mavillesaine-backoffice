@@ -769,17 +769,36 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.text("www.mavillesaine.fr",W-M,288,{align:"right"});
 
       toast("Étape 2: PDF prêt", { duration: 1500 });
-      const pdfBlob = doc.output("blob");
-      const sizeMo = (pdfBlob.size / 1024 / 1024).toFixed(2);
-      toast("PDF taille: " + sizeMo + " Mo", { duration: 3000 });
-      const fileName = `bon-intervention-${sig.ref}-${Date.now()}.pdf`;
       
-      toast("Étape 2.5: upload en cours...", { duration: 3000 });
-      const uploadPromise = uploadPdfToSupabase(pdfBlob, fileName);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Upload Supabase timeout 30s")), 30000)
-      );
-      const publicUrl = await Promise.race([uploadPromise, timeoutPromise]);
+      let pdfBlob;
+      try {
+        pdfBlob = doc.output("blob");
+        toast("✓ 2a: blob créé, taille " + (pdfBlob.size/1024/1024).toFixed(2) + " Mo", { duration: 3000 });
+      } catch(e) { 
+        alert("CRASH 2a (blob): " + e.message); 
+        throw e; 
+      }
+      
+      let fileName;
+      try {
+        fileName = `bon-intervention-${sig?.ref || "noref"}-${Date.now()}.pdf`;
+        toast("✓ 2b: filename = " + fileName, { duration: 3000 });
+      } catch(e) { 
+        alert("CRASH 2b (filename): " + e.message + " | sig=" + JSON.stringify(sig)); 
+        throw e; 
+      }
+      
+      toast("Étape 2.5: appel upload...", { duration: 3000 });
+      
+      let publicUrl;
+      try {
+        publicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
+        toast.success("✓ 2c: upload terminé, url = " + (publicUrl||"vide").slice(0,40));
+      } catch(e) { 
+        alert("CRASH 2c (upload): " + e.message + " | stack: " + (e.stack||"").slice(0,200)); 
+        throw e; 
+      }
+      
       toast.success("Étape 3: upload Supabase OK");
             setPdfUrl(publicUrl);
       setShowEnvoi(true);
