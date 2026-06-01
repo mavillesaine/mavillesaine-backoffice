@@ -770,10 +770,18 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
       toast("Étape 2: PDF prêt", { duration: 1500 });
       const pdfBlob = doc.output("blob");
+      const sizeMo = (pdfBlob.size / 1024 / 1024).toFixed(2);
+      toast("PDF taille: " + sizeMo + " Mo", { duration: 3000 });
       const fileName = `bon-intervention-${sig.ref}-${Date.now()}.pdf`;
-      const publicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
+      
+      toast("Étape 2.5: upload en cours...", { duration: 3000 });
+      const uploadPromise = uploadPdfToSupabase(pdfBlob, fileName);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Upload Supabase timeout 30s")), 30000)
+      );
+      const publicUrl = await Promise.race([uploadPromise, timeoutPromise]);
       toast.success("Étape 3: upload Supabase OK");
-      setPdfUrl(publicUrl);
+            setPdfUrl(publicUrl);
       setShowEnvoi(true);
     } catch(e) {
           toast.error("ERREUR à l'étape : " + e.message, { duration: 8000 });
