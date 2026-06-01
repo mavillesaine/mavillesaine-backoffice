@@ -84,16 +84,27 @@ function CatIcon({ id, size=36 }) {
 // ── Helper : upload PDF sur Supabase Storage ─────────────────
 async function uploadPdfToSupabase(pdfBlob, fileName) {
   const url = `${SUPABASE_URL}/storage/v1/object/bons-intervention/${fileName}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON}`,
-      "apikey":        SUPABASE_ANON,
-      "Content-Type":  "application/pdf",
-      "x-upsert":      "true",
-    },
-    body: pdfBlob,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SUPABASE_ANON}`,
+        "apikey":        SUPABASE_ANON,
+        "Content-Type":  "application/pdf",
+        "x-upsert":      "true",
+      },
+      body: pdfBlob,
+      signal: controller.signal,
+    });
+  } catch (fetchErr) {
+    clearTimeout(timeoutId);
+    if (fetchErr.name === "AbortError") throw new Error("Upload timeout 20s");
+    throw new Error("Fetch error: " + fetchErr.message);
+  }
+  clearTimeout(timeoutId);
   if (!response.ok) {
     const errText = await response.text();
     throw new Error(`Upload failed: ${response.status} - ${errText}`);
