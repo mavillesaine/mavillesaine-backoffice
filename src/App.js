@@ -1088,12 +1088,8 @@ export default function BackOffice() {
 
   useEffect(() => { charger(); }, [charger]);
 
-  // Auto-refresh toutes les 30 secondes pour voir les nouveaux votes en temps réel
-  useEffect(() => {
-    if (!user || user.role === "admin") return;
-    const interval = setInterval(() => { charger(); }, 30000);
-    return () => clearInterval(interval);
-  }, [user, charger]);
+  // Auto-refresh désactivé pour économiser l'egress Supabase (Free plan)
+  // Le superviseur peut rafraîchir manuellement avec F5 ou le bouton refresh
 
   const logout = () => {
     localStorage.removeItem("mvp_token");
