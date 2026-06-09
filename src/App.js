@@ -753,7 +753,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
         doc.setDrawColor(226,232,240); doc.rect(M+i*(pW+6),y,pW,pH,"S");
         if (photoUrl && photoUrl.startsWith("data:image")) {
           try {
-            doc.addImage(photoUrl, "JPEG", M+i*(pW+6)+2, y+2, pW-4, pH-10);
+           // doc.addImage(photoUrl, "JPEG", M+i*(pW+6)+2, y+2, pW-4, pH-10);
           } catch (e) {
             console.error("[PDF photo]", e);
           }
