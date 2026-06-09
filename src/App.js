@@ -137,7 +137,7 @@ function LoginScreen({ onLogin }) {
 
       // Récupère le rôle depuis Supabase (le backend ne le renvoie pas encore)
       const roleRes = await fetch(
-       `${SUPABASE_URL}/rest/v1/superviseurs?email=eq.${encodeURIComponent(email)}&select=role,commune_id`
+        `${SUPABASE_URL}/rest/v1/superviseurs?email=eq.${encodeURIComponent(email)}&select=role,commune_id`,
         { headers: sbHeaders() }
       );
       const roleData = await roleRes.json();
