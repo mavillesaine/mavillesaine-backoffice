@@ -682,8 +682,7 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 
   const genererEtEnvoyer = async () => {
     setLoadingPDF(true);
-    toast("Étape 1: démarrage", { duration: 1500 });
-    try {
+        try {
       if (!window.jspdf) {
         await new Promise((res,rej) => {
           const s = document.createElement("script");
@@ -782,43 +781,15 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       doc.setTextColor(80,100,80);
       doc.text("www.mavillesaine.fr",W-M,288,{align:"right"});
 
-      toast("Étape 2: PDF prêt", { duration: 1500 });
+           
+      const pdfBlob = doc.output("blob");
       
-      let pdfBlob;
-      try {
-        pdfBlob = doc.output("blob");
-        toast("✓ 2a: blob créé, taille " + (pdfBlob.size/1024/1024).toFixed(2) + " Mo", { duration: 3000 });
-      } catch(e) { 
-        alert("CRASH 2a (blob): " + e.message); 
-        throw e; 
-      }
-      
-      let fileName;
-      try {
-        fileName = `bon-intervention-${sig?.ref || "noref"}-${Date.now()}.pdf`;
-        toast("✓ 2b: filename = " + fileName, { duration: 3000 });
-      } catch(e) { 
-        alert("CRASH 2b (filename): " + e.message + " | sig=" + JSON.stringify(sig)); 
-        throw e; 
-      }
-      
-      toast("Étape 2.5: appel upload...", { duration: 3000 });
-      
-      let publicUrl;
-      try {
-        publicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
-        toast.success("✓ 2c: upload terminé, url = " + (publicUrl||"vide").slice(0,40));
-      } catch(e) { 
-        alert("CRASH 2c (upload): " + e.message + " | stack: " + (e.stack||"").slice(0,200)); 
-        throw e; 
-      }
-      
-      toast.success("Étape 3: upload Supabase OK");
-            setPdfUrl(publicUrl);
+      const fileName = `bon-intervention-${sig?.ref || "noref"}-${Date.now()}.pdf`;
+      const publicUrl = await uploadPdfToSupabase(pdfBlob, fileName);
+      setPdfUrl(publicUrl);
       setShowEnvoi(true);
     } catch(e) {
-          toast.error("ERREUR à l'étape : " + e.message, { duration: 8000 });
-      alert("Erreur attrapée : " + e.message + "\n\nStack: " + (e.stack || "n/a"));
+      toast.error("Erreur lors de la génération : " + e.message);
     } finally { setLoadingPDF(false); }
   };
 
