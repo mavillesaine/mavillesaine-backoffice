@@ -680,24 +680,27 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
   const EMAILJS_TEMPLATE_ID = "template_lemqmbu";
   const EMAILJS_PUBLIC_KEY  = "cMXDq8ugwqe46HU87";
 
+ const loadScript = (src) => new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Échec chargement : " + src));
+    document.head.appendChild(s);
+  });
+
   const genererEtEnvoyer = async () => {
     setLoadingPDF(true);
-        try {
+    try {
       if (!window.jspdf) {
-        await new Promise((res,rej) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-          s.onload=res; s.onerror=rej; document.head.appendChild(s);
-        });
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
       }
       if (!window.emailjs) {
-        await new Promise((res,rej) => {
-          const s = document.createElement("script");
-          s.src = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
-          s.onload=()=>{ window.emailjs.init(EMAILJS_PUBLIC_KEY); res(); };
-          s.onerror=rej; document.head.appendChild(s);
-        });
+        await loadScript("https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js");
+        window.emailjs.init(EMAILJS_PUBLIC_KEY);
       }
+      if (!window.jspdf) throw new Error("jsPDF non disponible — vérifiez la connexion");
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
       const W=210, M=15;
