@@ -1072,18 +1072,21 @@ export default function BackOffice() {
   const [showTech, setShowTech]           = useState(false);
   const [loading, setLoading]             = useState(false);
 
-  const communeId = user?.commune_id;
-  alert("commune_id = " + communeId + " | user = " + JSON.stringify(user));
-const sigUrl = communeId
-  ? `${SUPABASE_URL}/rest/v1/signalements?commune_id=eq.${communeId}&order=created_at.desc`
-  : `${SUPABASE_URL}/rest/v1/signalements?order=created_at.desc`;
+  const charger = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const communeId = user?.commune_id;
+      const sigUrl = communeId
+        ? `${SUPABASE_URL}/rest/v1/signalements?commune_id=eq.${communeId}&order=created_at.desc`
+        : `${SUPABASE_URL}/rest/v1/signalements?order=created_at.desc`;
 
-const [sigRes, techRes, statsRes] = await Promise.all([
-  fetch(sigUrl, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } })
-    .then(r => r.json()).then(data => ({ data: data })),
-  api.get("/techniciens"),
-  api.get("/stats"),
-]);
+      const [sigRes, techRes, statsRes] = await Promise.all([
+        fetch(sigUrl, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } })
+          .then(r => r.json()).then(data => ({ data: data })),
+        api.get("/techniciens"),
+        api.get("/stats"),
+      ]);
       setSignalements(Array.isArray(sigRes.data) ? sigRes.data : (sigRes.data.signalements || []));
       setTechniciens(techRes.data || []);
       setStats(statsRes.data);
