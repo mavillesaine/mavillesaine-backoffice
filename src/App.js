@@ -1033,6 +1033,17 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
 // BACK-OFFICE SUPERVISEUR
 // ============================================================
 export default function BackOffice() {
+  useEffect(() => {
+    const handler = (event) => {
+      alert("ERREUR GLOBALE :\n\n" + (event.message || event.reason?.message || event.reason || "inconnue") + "\n\n" + (event.error?.stack || "").slice(0, 400));
+    };
+    window.addEventListener("error", handler);
+    window.addEventListener("unhandledrejection", handler);
+    return () => {
+      window.removeEventListener("error", handler);
+      window.removeEventListener("unhandledrejection", handler);
+    };
+  }, []);
   const [user, setUser]                   = useState(() => {
     const u = localStorage.getItem("mvp_user");
     return u ? JSON.parse(u) : null;
