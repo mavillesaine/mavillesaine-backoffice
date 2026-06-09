@@ -1110,13 +1110,7 @@ export default function BackOffice() {
       toast.error("Erreur de chargement : " + (err.response?.data?.error || err.message));
     } finally { setLoading(false); }
   }, [user]);
-      setSignalements(Array.isArray(sigRes.data) ? sigRes.data : (sigRes.data.signalements || []));
-      setTechniciens(techRes.data || []);
-      setStats(statsRes.data);
-    } catch (err) {
-      toast.error("Erreur de chargement : " + (err.response?.data?.error || err.message));
-    } finally { setLoading(false); }
-  }, [user]);
+      
 
   useEffect(() => { charger(); }, [charger]);
 
