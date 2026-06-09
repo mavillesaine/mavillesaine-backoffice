@@ -137,12 +137,15 @@ function LoginScreen({ onLogin }) {
 
       // Récupère le rôle depuis Supabase (le backend ne le renvoie pas encore)
       const roleRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/superviseurs?email=eq.${encodeURIComponent(email)}&select=role`,
+       `${SUPABASE_URL}/rest/v1/superviseurs?email=eq.${encodeURIComponent(email)}&select=role,commune_id`
         { headers: sbHeaders() }
       );
       const roleData = await roleRes.json();
-      const enrichedUser = { ...data.user, role: roleData[0]?.role || "superviseur" };
-
+      const enrichedUser = { 
+  ...data.user, 
+  role: roleData[0]?.role || "superviseur",
+  commune_id: roleData[0]?.commune_id || data.user?.commune_id || null
+};
       localStorage.setItem("mvp_token", data.token);
       localStorage.setItem("mvp_user",  JSON.stringify(enrichedUser));
       onLogin(enrichedUser);
@@ -1069,15 +1072,18 @@ export default function BackOffice() {
   const [showTech, setShowTech]           = useState(false);
   const [loading, setLoading]             = useState(false);
 
-  const charger = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const [sigRes, techRes, statsRes] = await Promise.all([
-        api.get("/signalements"),
-        api.get("/techniciens"),
-        api.get("/stats"),
-      ]);
+  const communeId = user?.commune_id;
+  alert("commune_id = " + communeId + " | user = " + JSON.stringify(user));
+const sigUrl = communeId
+  ? `${SUPABASE_URL}/rest/v1/signalements?commune_id=eq.${communeId}&order=created_at.desc`
+  : `${SUPABASE_URL}/rest/v1/signalements?order=created_at.desc`;
+
+const [sigRes, techRes, statsRes] = await Promise.all([
+  fetch(sigUrl, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } })
+    .then(r => r.json()).then(data => ({ data: data })),
+  api.get("/techniciens"),
+  api.get("/stats"),
+]);
       setSignalements(Array.isArray(sigRes.data) ? sigRes.data : (sigRes.data.signalements || []));
       setTechniciens(techRes.data || []);
       setStats(statsRes.data);
