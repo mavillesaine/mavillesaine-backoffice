@@ -1081,12 +1081,35 @@ export default function BackOffice() {
         ? `${SUPABASE_URL}/rest/v1/signalements?commune_id=eq.${communeId}&order=created_at.desc`
         : `${SUPABASE_URL}/rest/v1/signalements?order=created_at.desc`;
 
-      const [sigRes, techRes, statsRes] = await Promise.all([
+      const [sigRes, techRes] = await Promise.all([
         fetch(sigUrl, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } })
-          .then(r => r.json()).then(data => ({ data: data })),
+          .then(r => r.json()),
         api.get("/techniciens"),
-        api.get("/stats"),
       ]);
+
+      const sigList = Array.isArray(sigRes) ? sigRes : (sigRes.signalements || []);
+      setSignalements(sigList);
+      setTechniciens(techRes.data || []);
+
+      // Stats calculées localement à partir des signalements filtrés par commune
+      const now = new Date();
+      const stats = {
+        total: sigList.length,
+        recu: sigList.filter(s => s.statut === "recu").length,
+        en_cours: sigList.filter(s => s.statut === "en_cours").length,
+        resolu: sigList.filter(s => s.statut === "resolu").length,
+        danger: sigList.filter(s => s.urgence === "dangereux").length,
+        ce_mois: sigList.filter(s => {
+          if (!s.created_at) return false;
+          const d = new Date(s.created_at);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).length,
+      };
+      setStats(stats);
+    } catch (err) {
+      toast.error("Erreur de chargement : " + (err.response?.data?.error || err.message));
+    } finally { setLoading(false); }
+  }, [user]);
       setSignalements(Array.isArray(sigRes.data) ? sigRes.data : (sigRes.data.signalements || []));
       setTechniciens(techRes.data || []);
       setStats(statsRes.data);
