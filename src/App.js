@@ -792,7 +792,8 @@ function PanneauDetail({ sig, techniciens, onClose, onUpdate }) {
       setPdfUrl(publicUrl);
       setShowEnvoi(true);
     } catch(e) {
-      toast.error("Erreur lors de la génération : " + e.message);
+      alert("ERREUR GÉNÉRATION PDF :\n\n" + (e.message || e) + "\n\n" + (e.stack || "").slice(0, 300));
+      toast.error("Erreur lors de la génération");
     } finally { setLoadingPDF(false); }
   };
 
